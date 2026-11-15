@@ -16,7 +16,11 @@ from src.data.costa_rica_locations import find_closest_location
 from src.data.crops_catalog import CROPS_LIST
 from src.services.data_lake import get_unified_environmental_profile
 from src.models.sensitivity_viability_model import SensitivityViabilityModel
-from src.services.rotation_service import RotationAnalysisService, CROP_ROTATION_PLANS, ROTATION_PARTNERS
+from src.services.rotation_service import (
+    RotationAnalysisService,
+    MULTI_STRATEGY_CATALOG,
+    ROTATION_PARTNERS,
+)
 from src.components.sidebar import (
     render_sidebar,
     PAGE_ANALYZE,
@@ -35,6 +39,9 @@ from src.components.charts import (
     create_viability_bar_chart,
     create_delta_comparison_chart,
     create_rotation_radar_chart,
+    create_multi_rotation_radar_chart,
+    create_vulnerability_timeline_chart,
+    create_climate_scenario_chart,
     create_rotation_gauge,
 )
 from src.i18n import t, lang
@@ -381,6 +388,10 @@ def render_crop_card(res: Dict[str, Any], dark_mode: bool = False):
     s_score = res["sensitivity"]["composite_sensitivity"]
     deltas = res["deltas"]
     txt_col = "#FFFFFF" if dark_mode else "#000000"
+    bg_card = "#182028" if dark_mode else "#FFFFFF"
+    border_card = "#2B3542" if dark_mode else "#D1D5DB"
+    notice_bg = "#12251A" if dark_mode else "#F1F8E9"
+    notice_border = "#2E7D32" if dark_mode else "#43A047"
 
     st.markdown(f"""
     <div class="crop-card" style="border-left: 5px solid {col};">
@@ -418,6 +429,10 @@ def main():
     st.markdown(get_app_css(dark_mode), unsafe_allow_html=True)
 
     txt_col = "#FFFFFF" if dark_mode else "#000000"
+    bg_card = "#182028" if dark_mode else "#FFFFFF"
+    border_card = "#2B3542" if dark_mode else "#D1D5DB"
+    notice_bg = "#12251A" if dark_mode else "#F1F8E9"
+    notice_border = "#2E7D32" if dark_mode else "#43A047"
 
     with st.spinner("Consultando satélites (SMAP · GPM · ECOSTRESS · SRTM) y bases IMN…" if current_lang == "es" else "Querying satellites (SMAP · GPM · ECOSTRESS · SRTM) & IMN databases…"):
         env = load_env_profile(lat, lon)
@@ -428,6 +443,7 @@ def main():
     actual_alt = env["topography_and_erosion"]["elevation_msnm"]
     actual_sm  = env["humidity_and_moisture"]["smap_root_zone_moisture_m3_m3"]
     actual_soil= env["soil"]["order"]
+    actual_slope = float(env["topography_and_erosion"].get("slope_percent", 8.0))
 
     # Viability results for all 5 crops
     all_results: List[Dict[str, Any]] = SensitivityViabilityModel.calculate_all_crops(
@@ -739,22 +755,82 @@ def main():
         <div class="info-notice">
             🌱 <b>{t('rotation_title')}:</b> {t('rotation_intro')}
         </div>
+        <div style="background:{notice_bg}; border:1.5px solid {notice_border}; border-radius:8px; padding:12px 16px; margin-bottom:18px; font-size:12.5px; color:{txt_col};">
+            {t('rotation_disclaimer')}
+        </div>
         """, unsafe_allow_html=True)
 
-        # Primary crop selection
-        crop_choices = [c["crop"] for c in CROPS_LIST]
-        selected_primary = st.selectbox(
-            t("rotation_select_primary"),
-            crop_choices,
-            index=0,
-            format_func=lambda c: f"{next(x['icon'] for x in CROPS_LIST if x['crop'] == c)} {c} ({next(x.get('common_name_es', x['crop']) for x in CROPS_LIST if x['crop'] == c)})"
-        )
+        # ── Primary Crop & Farmer Priorities Controls ─────────────────────────
+        c_col1, c_col2 = st.columns([1.1, 1.3], gap="medium")
+        with c_col1:
+            crop_choices = [c["crop"] for c in CROPS_LIST]
+            selected_primary = st.selectbox(
+                t("rotation_select_primary"),
+                crop_choices,
+                index=0,
+                format_func=lambda c: f"{next(x['icon'] for x in CROPS_LIST if x['crop'] == c)} {c} ({next(x.get('common_name_es', x['crop']) for x in CROPS_LIST if x['crop'] == c)})"
+            )
+        with c_col2:
+            priority_options = [
+                ("balanced", t("priority_balanced")),
+                ("soil_health", t("priority_soil")),
+                ("water_conservation", t("priority_water")),
+                ("income", t("priority_income")),
+                ("pest_control", t("priority_pest")),
+                ("erosion_control", t("priority_erosion")),
+            ]
+            selected_p_tuple = st.selectbox(
+                t("rotation_priority_title"),
+                priority_options,
+                format_func=lambda x: x[1],
+                index=0,
+            )
+            farmer_priority = selected_p_tuple[0]
 
+        # ── Satellite & In-situ Context Indicators ────────────────────────────
+        term_smap = render_term("Soil Moisture Anomalies", "SMAP L4")
+        term_gpm = render_term("Water-Balance Indicators", "GPM DPR")
+        term_et = render_term("Evapotranspiration", "ECOSTRESS ESI")
+        term_grid = render_term("Harmonized Resolution Grid", "Cuadrícula NASA/IMN" if current_lang == "es" else "NASA/IMN Grid")
+        st.markdown(f"""
+        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
+            <span class="mission-pill">⛰️ {actual_alt} msnm (SRTM 30m)</span>
+            <span class="mission-pill">🌧️ {actual_p:.0f} mm/año ({term_gpm})</span>
+            <span class="mission-pill">🌱 {actual_sm:.3f} m³/m³ ({term_smap})</span>
+            <span class="mission-pill">🪨 {actual_soil} (IMN Suelos)</span>
+            <span class="mission-pill">📐 Pendiente: {actual_slope:.1f}% ({env['topography_and_erosion']['landform_classification']})</span>
+            <span class="mission-pill">🛰️ {term_grid}</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # ── Climate Scenario Simulator (What-If Sliders) ───────────────────────
+        with st.expander(t("simulation_title"), expanded=False):
+            st.markdown(
+                ("💡 **Simulación de Resiliencia Climática:** Ajuste los controles para evaluar el comportamiento "
+                 "de las estrategias ante eventos de estrés (ej. sequías por El Niño, canículas prolongadas o excesos pluviales).")
+                if current_lang == "es" else
+                ("💡 **Climate Resilience Simulation:** Adjust controls to evaluate strategy performance under "
+                 "stress events (e.g., El Niño droughts, heatwaves, or extreme cloudbursts).")
+            )
+            sim_col1, sim_col2 = st.columns(2)
+            with sim_col1:
+                sim_delta_t = st.slider(
+                    "🌡️ " + ("Variación de Temperatura (ΔT °C):" if current_lang == "es" else "Temperature Variation (ΔT °C):"),
+                    min_value=-2.0, max_value=4.0, value=0.0, step=0.5,
+                    format="%+.1f °C"
+                )
+            with sim_col2:
+                sim_delta_p = st.slider(
+                    "🌧️ " + ("Variación de Precipitación (ΔP %):" if current_lang == "es" else "Precipitation Variation (ΔP %):"),
+                    min_value=-50, max_value=50, value=0, step=5,
+                    format="%+d%%"
+                )
+
+        # ── Evaluate Multi-Strategy Rotation Engine ───────────────────────────
         primary_result = next(r for r in all_results if r["crop"] == selected_primary)
         primary_viability = primary_result["success_percentage"]
 
-        # Evaluate rotation model
-        rot_eval = RotationAnalysisService.evaluate_rotation(
+        rot_analysis = RotationAnalysisService.evaluate_rotation_strategies(
             primary_crop=selected_primary,
             primary_viability=primary_viability,
             actual_temp_c=actual_t,
@@ -762,119 +838,246 @@ def main():
             actual_altitude_m=actual_alt,
             actual_soil_moisture_m3_m3=actual_sm,
             actual_soil_type=actual_soil,
+            actual_slope_pct=actual_slope,
+            farmer_priority=farmer_priority,
+            delta_temp_c=sim_delta_t,
+            delta_precip_pct=sim_delta_p,
         )
 
-        # Highlight callout: Is rotation a better alternative?
-        net_adv = rot_eval["net_advantage_pct"]
-        is_rec = rot_eval["is_recommended"]
-        rec_badge = "✅ " + ("Muy Recomendada (Alternativa Superior al Monocultivo)" if current_lang == "es" else "Highly Recommended (Superior Alternative to Monoculture)") if is_rec else "⚠️ " + ("Viable pero Requiere Manejo Especial" if current_lang == "es" else "Viable but Requires Special Management")
-        rec_color = "#2E7D32" if is_rec else "#F57C00"
+        evaluated_strats = rot_analysis["strategies"]
+        rec_strat = rot_analysis["recommended_strategy"]
+        calendar_timeline = rot_analysis["vulnerability_calendar"]
+        baseline_score = rot_analysis["baseline_viability"]
 
-        st.markdown(f"""
-        <div class="rotation-card-highlight">
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-                <div>
-                    <span style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.8px; color:{rec_color};">{t('rotation_viability_title')}</span>
-                    <h3 style="margin:2px 0 4px 0; color:{txt_col}; font-size:20px; font-weight:800;">{rot_eval['rotation_type']}</h3>
-                    <span style="display:inline-block; background:{rec_color}; color:white !important; font-size:12px; font-weight:700; padding:2px 10px; border-radius:14px;">{rec_badge}</span>
-                </div>
-                <div style="text-align:right;">
-                    <span style="font-size:11px; color:{txt_col}; font-weight:700; text-transform:uppercase;">{'Ventaja sobre Monocultivo' if current_lang == 'es' else 'Advantage over Monoculture'}</span>
-                    <div style="font-size:36px; font-weight:900; color:{rec_color}; line-height:1.1;">+{net_adv}%</div>
-                    <span style="font-size:11px; color:{txt_col};">{'Índice Global de Sostenibilidad' if current_lang == 'es' else 'Global Sustainability Index'}</span>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        # ── Strategy Comparison Overview Cards ────────────────────────────────
+        st.markdown(f"<div class='section-title'>{t('strategy_comparison_title')}</div>", unsafe_allow_html=True)
 
-        col_rot_L, col_rot_R = st.columns([1.1, 1.0], gap="large")
+        cols_strats = st.columns(len(evaluated_strats), gap="small")
+        for idx, (c_strat, col) in enumerate(zip(evaluated_strats, cols_strats)):
+            is_base = c_strat.get("is_baseline", False)
+            is_rec = c_strat.get("is_top_recommendation", False)
+            viab = c_strat["viability_score"]
+            v_col = score_color(viab, dark_mode)
+            align = c_strat["farmer_alignment_score"]
 
-        # ── Left Column: Radar Chart + Gauge + Rotation Schedule ───────────
-        with col_rot_L:
-            st.markdown(f"<div class='section-title' style='margin-top:0;'>{t('rotation_vs_mono_title')}</div>", unsafe_allow_html=True)
+            if is_rec:
+                badge_html = f"<span style='background:#2E7D32; color:white !important; font-size:10px; font-weight:800; padding:2px 7px; border-radius:10px;'>{t('top_recommended_badge')}</span>"
+                border_style = "2px solid #2E7D32"
+                card_bg = notice_bg
+            elif is_base:
+                badge_html = f"<span style='background:#757575; color:white !important; font-size:10px; font-weight:800; padding:2px 7px; border-radius:10px;'>{t('baseline_badge')}</span>"
+                border_style = f"1px solid {border_card}"
+                card_bg = bg_card
+            else:
+                badge_html = f"<span style='background:#1565C0; color:white !important; font-size:10px; font-weight:800; padding:2px 7px; border-radius:10px;'>{'ALTERNATIVA VIABLE' if current_lang == 'es' else 'VIABLE OPTION'}</span>"
+                border_style = f"1px solid {border_card}"
+                card_bg = bg_card
 
-            # Radar chart comparing monoculture vs rotation
-            st.plotly_chart(
-                create_rotation_radar_chart(rot_eval["comparison"], selected_primary, dark_mode=dark_mode, lang=current_lang),
-                use_container_width=True
-            )
+            strat_title = c_strat["name_es"] if current_lang == "es" else c_strat["name_en"]
+            strat_tag = c_strat["tag_es"] if current_lang == "es" else c_strat["tag_en"]
+            net_vs_base = c_strat["net_advantage_vs_baseline"]
+            net_txt = f"+{net_vs_base}%" if net_vs_base > 0 else f"{net_vs_base}%"
+            net_color = "#2E7D32" if net_vs_base > 0 else ("#757575" if net_vs_base == 0 else "#D32F2F")
 
-            # Gauge for rotation viability
-            st.plotly_chart(
-                create_rotation_gauge(rot_eval["combined_viability"], selected_primary, dark_mode=dark_mode, lang=current_lang),
-                use_container_width=True
-            )
-
-            # Schedule timeline table
-            st.markdown(f"<div class='section-title'>{t('rotation_schedule_title')}</div>", unsafe_allow_html=True)
-            schedule_rows = []
-            for item in rot_eval["schedule"]:
-                y_lbl = item["year"] if current_lang == "es" else item["year_en"]
-                ph_lbl = item["phase"] if current_lang == "es" else item["phase_en"]
-                schedule_rows.append({
-                    t("year_label"): y_lbl,
-                    "Fase / Práctica" if current_lang == "es" else "Phase / Practice": ph_lbl,
-                    "Función Ecológica" if current_lang == "es" else "Ecological Function": item["role"],
-                })
-            st.dataframe(pd.DataFrame(schedule_rows), use_container_width=True, hide_index=True)
-
-        # ── Right Column: Rotation Partners & Agronomic Benefits ──────────
-        with col_rot_R:
-            st.markdown(f"<div class='section-title' style='margin-top:0;'>{t('rotation_partner_title')}</div>", unsafe_allow_html=True)
-
-            # Display partner 1 & partner 2
-            partners = [
-                (rot_eval["partner_1"], rot_eval["partner_1_fit"]),
-                (rot_eval["partner_2"], rot_eval["partner_2_fit"]),
-            ]
-            for partner, fit_score in partners:
-                p_name = partner["name_es"] if current_lang == "es" else partner["name_en"]
-                p_cat  = partner["category"] if current_lang == "es" else partner["category_en"]
-                p_soil = partner["soil_benefit"] if current_lang == "es" else partner["soil_benefit_en"]
-                p_pest = partner["pest_break"] if current_lang == "es" else partner["pest_break_en"]
-                p_water= partner["water_needs"] if current_lang == "es" else partner["water_needs_en"]
-                fit_col= score_color(fit_score, dark_mode)
-
+            with col:
                 st.markdown(f"""
-                <div class="rotation-card" style="border-left: 5px solid {fit_col};">
-                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                        <div>
-                            <span style="font-size:15px; font-weight:800; color:{txt_col};">{partner['icon']} {p_name}</span><br>
-                            <span style="font-size:11px; font-weight:700; color:#E65100; text-transform:uppercase;">{p_cat}</span>
-                        </div>
-                        <div style="text-align:right;">
-                            <span style="font-size:18px; font-weight:900; color:{fit_col};">{fit_score}%</span><br>
-                            <span style="font-size:9.5px; color:{txt_col};">{'Aptitud Local' if current_lang == 'es' else 'Local Fit'}</span>
-                        </div>
+                <div style="background:{card_bg}; border:{border_style}; border-radius:9px; padding:13px; height:100%; display:flex; flex-direction:column; justify-content:space-between;">
+                    <div>
+                        <div style="margin-bottom:6px;">{badge_html}</div>
+                        <h4 style="margin:2px 0 4px 0; font-size:14px; font-weight:800; color:{txt_col};">{c_strat.get('icon', '🌱')} {strat_title.split(':')[0]}</h4>
+                        <div style="font-size:11px; font-weight:700; color:#E65100; margin-bottom:8px;">{strat_tag}</div>
                     </div>
-                    <div style="margin-top:8px; font-size:12px; color:{txt_col};">
-                        <div style="margin-bottom:4px;"><b>🌱 {'Suelo & Nutrientes' if current_lang == 'es' else 'Soil & Nutrients'}:</b> {p_soil}</div>
-                        <div style="margin-bottom:4px;"><b>🛡️ {'Corte de Plagas' if current_lang == 'es' else 'Pest Disruption'}:</b> {p_pest}</div>
-                        <div><b>💧 {'Demanda Hídrica' if current_lang == 'es' else 'Water Demand'}:</b> {p_water}</div>
+                    <div>
+                        <div style="display:flex; justify-content:space-between; align-items:baseline; margin:6px 0;">
+                            <span style="font-size:11px; color:{txt_col};">{'Viabilidad' if current_lang == 'es' else 'Viability'}:</span>
+                            <span style="font-size:22px; font-weight:900; color:{v_col};">{viab}%</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px;">
+                            <span style="color:{txt_col};">{'Ventaja neta' if current_lang == 'es' else 'Net advantage'}:</span>
+                            <b style="color:{net_color};">{net_txt}</b>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; font-size:11px;">
+                            <span style="color:{txt_col};">{'Alineación Meta' if current_lang == 'es' else 'Goal fit'}:</span>
+                            <b style="color:{txt_col};">{align}%</b>
+                        </div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
 
-            # Benefits of this rotation
-            st.markdown(f"<div class='section-title'>{t('rotation_benefits_title')}</div>", unsafe_allow_html=True)
-            benefits = rot_eval["benefits_es"] if current_lang == "es" else rot_eval["benefits_en"]
-            for b in benefits:
+        st.markdown("<div style='margin-top:18px;'></div>", unsafe_allow_html=True)
+
+        # ── Detailed Strategy Inspector (The 5 Mandatory NASA Pillars) ────────
+        strat_display_names = [
+            f"{s.get('icon', '🌱')} {s['name_es'] if current_lang == 'es' else s['name_en']}"
+            for s in evaluated_strats
+        ]
+        rec_index = next((i for i, s in enumerate(evaluated_strats) if s["strategy_id"] == rec_strat["strategy_id"]), 1)
+
+        st.markdown(f"<div class='section-title'>{t('rotation_schedule_title')}</div>", unsafe_allow_html=True)
+        selected_strat_label = st.radio(
+            "Seleccionar Estrategia para Inspección Detallada:" if current_lang == "es" else "Select Strategy for In-Depth Inspection:",
+            strat_display_names,
+            index=rec_index,
+            horizontal=True,
+        )
+        active_strat_idx = strat_display_names.index(selected_strat_label)
+        active_strat = evaluated_strats[active_strat_idx]
+
+        # Inspector layout: 2 Columns (Pillars on Left, Schedule on Right)
+        col_pills_L, col_pills_R = st.columns([1.15, 0.95], gap="large")
+
+        with col_pills_L:
+            # Pillar 1: Why it was suggested
+            st.markdown(f"#### {t('why_suggested_title')}")
+            why_txt = active_strat["why_suggested_es"] if current_lang == "es" else active_strat["why_suggested_en"]
+            st.markdown(f"""
+            <div style="background:{bg_card}; border:1px solid {border_card}; border-left:4px solid #1565C0; border-radius:6px; padding:12px 14px; margin-bottom:12px; font-size:13px; color:{txt_col}; line-height:1.45;">
+                {why_txt}
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Pillar 2: Supporting Evidence (NASA + IMN)
+            st.markdown(f"#### {t('evidence_title')}")
+            ev_txt = active_strat["evidence_supporting_es"] if current_lang == "es" else active_strat["evidence_supporting_en"]
+            st.markdown(f"""
+            <div style="background:{bg_card}; border:1px solid {border_card}; border-left:4px solid #2E7D32; border-radius:6px; padding:12px 14px; margin-bottom:12px; font-size:13px; color:{txt_col}; line-height:1.45;">
+                {ev_txt}
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Pillar 3: Agronomic & Environmental Benefits
+            st.markdown(f"#### {t('benefits_title')}")
+            b_list = active_strat["benefits_es"] if current_lang == "es" else active_strat["benefits_en"]
+            for b in b_list:
                 st.markdown(f"- ✅ **{b}**")
 
-            # Risks & agronomic considerations
-            st.markdown(f"<div class='section-title'>{t('rotation_risks_title')}</div>", unsafe_allow_html=True)
-            risks = rot_eval["risks_es"] if current_lang == "es" else rot_eval["risks_en"]
-            for r in risks:
+            # Pillar 4: Information Gaps & Uncertainty
+            st.markdown(f"#### {t('gaps_title')}")
+            gap_txt = active_strat["information_gaps_es"] if current_lang == "es" else active_strat["information_gaps_en"]
+            st.markdown(f"""
+            <div style="background:{bg_card}; border:1px solid {border_card}; border-left:4px solid #FF8F00; border-radius:6px; padding:12px 14px; margin-bottom:12px; font-size:12.5px; color:{txt_col};">
+                ℹ️ {gap_txt}
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Pillar 5: Critical Points for Farmer Local Review
+            st.markdown(f"#### {t('farmer_review_title')}")
+            r_list = active_strat["risks_and_farmer_review_es"] if current_lang == "es" else active_strat["risks_and_farmer_review_en"]
+            for r in r_list:
                 st.markdown(f"- ⚠️ {r}")
 
-        # ── Cross-crop rotation comparison matrix ──────────────────────────
+        with col_pills_R:
+            # Agronomic Sequence Table
+            st.markdown(f"#### {'📅 Secuencia Cronológica de Cultivos' if current_lang == 'es' else '📅 Chronological Crop Sequence'}")
+            sched_rows = []
+            for item in active_strat["schedule"]:
+                p_lbl = item["period_es"] if current_lang == "es" else item["period_en"]
+                pr_lbl = item["practice_es"] if current_lang == "es" else item["practice_en"]
+                r_lbl = item["role_es"] if current_lang == "es" else item["role_en"]
+                sched_rows.append({
+                    t("year_label"): p_lbl,
+                    "Práctica / Cultivo" if current_lang == "es" else "Practice / Crop": pr_lbl,
+                    "Función Ecológica" if current_lang == "es" else "Ecological Role": r_lbl,
+                })
+            st.dataframe(pd.DataFrame(sched_rows), use_container_width=True, hide_index=True)
+
+            # Associated Rotational Partner Species
+            if active_strat["partners"]:
+                st.markdown(f"<div style='margin-top:14px;'><b>{t('rotation_partner_title')}:</b></div>", unsafe_allow_html=True)
+                for p_key in active_strat["partners"]:
+                    if p_key in ROTATION_PARTNERS:
+                        part = ROTATION_PARTNERS[p_key]
+                        p_name = part["name_es"] if current_lang == "es" else part["name_en"]
+                        p_cat = part["category_es"] if current_lang == "es" else part["category_en"]
+                        p_soil = part["soil_benefit_es"] if current_lang == "es" else part["soil_benefit_en"]
+                        p_pest = part["pest_break_es"] if current_lang == "es" else part["pest_break_en"]
+                        st.markdown(f"""
+                        <div class="rotation-card" style="margin-bottom:8px; padding:10px 12px; border-left:4px solid #2E7D32;">
+                            <div style="font-weight:800; font-size:13px; color:{txt_col};">{part['icon']} {p_name}</div>
+                            <div style="font-size:10.5px; font-weight:700; color:#E65100; text-transform:uppercase;">{p_cat}</div>
+                            <div style="font-size:11.5px; margin-top:4px; color:{txt_col};">🌱 {p_soil}</div>
+                            <div style="font-size:11.5px; color:{txt_col};">🛡️ {p_pest}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
         st.markdown("---")
+
+        # ── Visual Analytics: Radar Comparison & Climate Scenario Simulation ───
+        col_chart_L, col_chart_R = st.columns([1.1, 1.0], gap="large")
+        with col_chart_L:
+            st.plotly_chart(
+                create_multi_rotation_radar_chart(evaluated_strats, selected_primary, dark_mode=dark_mode, lang=current_lang),
+                use_container_width=True
+            )
+        with col_chart_R:
+            st.plotly_chart(
+                create_climate_scenario_chart(
+                    evaluated_strats,
+                    selected_primary,
+                    delta_temp=sim_delta_t,
+                    delta_precip=sim_delta_p,
+                    dark_mode=dark_mode,
+                    lang=current_lang
+                ),
+                use_container_width=True
+            )
+
+        st.markdown("---")
+
+        # ── 12-Month Agro-Climatic Vulnerability & Bare-Field Transition Calendar ──
+        st.markdown(f"<div class='section-title'>{t('timeline_title')}</div>", unsafe_allow_html=True)
+        st.caption(
+            "Visualiza la correlación entre las precipitaciones satelitales (GPM), el estrés térmico/hídrico, "
+            "los períodos de suelo desnudo en monocultivo y la protección continua que brinda la cobertura viva rotacional."
+            if current_lang == "es" else
+            "Visualizes the correlation between satellite rainfall (GPM), climate stress, bare-soil vulnerability "
+            "under monoculture, and the continuous living armor provided by rotational covers."
+        )
+
+        st.plotly_chart(
+            create_vulnerability_timeline_chart(calendar_timeline, dark_mode=dark_mode, lang=current_lang),
+            use_container_width=True
+        )
+
+        # Contextual Interpretation of Seasonal Windows
+        c_win1, c_win2, c_win3 = st.columns(3)
+        with c_win1:
+            st.markdown(f"""
+            <div class="rotation-card" style="border-top: 3px solid #E65100; height:100%;">
+                <b style="color:#E65100;">☀️ {'Períodos de Suelo Desnudo' if current_lang == 'es' else 'Bare-Soil Vulnerability'}</b>
+                <p style="font-size:12px; margin-top:6px; color:{txt_col};">
+                {'En monocultivos, los meses secos (Ene-Abr) y post-cosecha dejan el terreno sin cobertura. La radiación directa degrada la materia orgánica y el viento acelera la erosión.' if current_lang == 'es' else 'Under monoculture, dry months (Jan-Apr) leave ground completely bare. Solar radiation oxidizes organic matter and trade winds accelerate erosion.'}
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+        with c_win2:
+            st.markdown(f"""
+            <div class="rotation-card" style="border-top: 3px solid #2E7D32; height:100%;">
+                <b style="color:#2E7D32;">🌱 {'Ventana Óptima de Siembra' if current_lang == 'es' else 'Optimal Sowing Window'}</b>
+                <p style="font-size:12px; margin-top:6px; color:{txt_col};">
+                {'Con la entrada de las lluvias en mayo (registradas por GPM), la siembra inmediata de leguminosas (Canavalia, Caupí) asegura rápida germinación y fijación simbiótica de nitrógeno.' if current_lang == 'es' else 'With monsoon onset in May (tracked by GPM), immediate legume sowing ensures rapid establishment and symbiotic biological nitrogen fixation.'}
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+        with c_win3:
+            st.markdown(f"""
+            <div class="rotation-card" style="border-top: 3px solid #1565C0; height:100%;">
+                <b style="color:#1565C0;">✂️ {'Acolchado & Veranillo' if current_lang == 'es' else 'Mulch & Dry Spell Buffering'}</b>
+                <p style="font-size:12px; margin-top:6px; color:{txt_col};">
+                {'Segar la cobertura viva en julio antes del Veranillo de San Juan crea un colchón de mulch que reduce la evapotranspiración (ECOSTRESS) y mantiene la humedad radicular (SMAP).' if current_lang == 'es' else 'Slashing living cover in July prior to the midsummer drought forms a thick mulch that curbs evapotranspiration (ECOSTRESS) and preserves root moisture (SMAP).'}
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("---")
+
+        # ── Cross-crop rotation comparison matrix ──────────────────────────
         st.markdown(f"<div class='section-title'>{'📊 Resumen de Rotaciones para los 5 Cultivos en este Punto' if current_lang == 'es' else '📊 Rotation Summary for All 5 Crops at this Location'}</div>", unsafe_allow_html=True)
         rot_summary = []
         for c in CROPS_LIST:
             c_name = c["crop"]
             c_viab = next(r["success_percentage"] for r in all_results if r["crop"] == c_name)
-            c_rot = RotationAnalysisService.evaluate_rotation(
+            c_analysis = RotationAnalysisService.evaluate_rotation_strategies(
                 primary_crop=c_name,
                 primary_viability=c_viab,
                 actual_temp_c=actual_t,
@@ -882,14 +1085,19 @@ def main():
                 actual_altitude_m=actual_alt,
                 actual_soil_moisture_m3_m3=actual_sm,
                 actual_soil_type=actual_soil,
+                actual_slope_pct=actual_slope,
+                farmer_priority=farmer_priority,
+                delta_temp_c=sim_delta_t,
+                delta_precip_pct=sim_delta_p,
             )
+            top_strat = c_analysis["recommended_strategy"]
             rot_summary.append({
                 t("crop_label"): f"{c['icon']} {c_name}",
-                "Viabilidad Monocultivo" if current_lang == "es" else "Monoculture Viability": f"{c_viab}%",
-                "Viabilidad con Rotación" if current_lang == "es" else "Rotation Viability": f"{c_rot['combined_viability']}%",
-                "Ventaja Neta" if current_lang == "es" else "Net Advantage": f"+{c_rot['net_advantage_pct']}%",
-                "Esquema Rotacional" if current_lang == "es" else "Rotation Scheme": c_rot["rotation_type"].split("(")[0].strip(),
-                "¿Es Mejor Alternativa?" if current_lang == "es" else "Better Alternative?": "✅ Sí / Yes" if c_rot["is_recommended"] else "⚠️ Condicional / Conditional",
+                "Viabilidad Monocultivo" if current_lang == "es" else "Monoculture Viability": f"{c_analysis['baseline_viability']}%",
+                "Viabilidad con Rotación" if current_lang == "es" else "Rotation Viability": f"{top_strat['viability_score']}%",
+                "Ventaja Neta" if current_lang == "es" else "Net Advantage": f"+{top_strat['net_advantage_vs_baseline']}%" if top_strat['net_advantage_vs_baseline'] > 0 else f"{top_strat['net_advantage_vs_baseline']}%",
+                "Estrategia Recomendada" if current_lang == "es" else "Recommended Strategy": top_strat["name_es"].split(":")[1].strip() if current_lang == "es" else top_strat["name_en"].split(":")[1].strip(),
+                "Alineación con Meta" if current_lang == "es" else "Farmer Goal Alignment": f"{top_strat['farmer_alignment_score']}%",
             })
         st.dataframe(pd.DataFrame(rot_summary), use_container_width=True, hide_index=True)
 

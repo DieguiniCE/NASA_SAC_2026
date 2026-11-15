@@ -93,29 +93,57 @@ TRANSLATIONS = {
     "status_none":      {"es": "No Viable",           "en": "Not Viable"},
 
     # ── Page 3: Rotation ──────────────────────────────────────────────────────
-    "rotation_title":   {"es": "🔄 Rotación de Cultivos — Análisis de Viabilidad Combinada",
-                         "en": "🔄 Crop Rotation — Combined Viability Analysis"},
+    "rotation_title":   {"es": "🔄 Exploración de Rotación de Cultivos — Decisión Agroecológica",
+                         "en": "🔄 Crop Rotation Strategy Explorer — Agroecological Decision Tool"},
     "rotation_intro":   {
-        "es": "La rotación de cultivos mejora la salud del suelo, rompe ciclos de plagas y puede aumentar "
-              "el rendimiento general. Este módulo evalúa qué secuencias de cultivos son viables para las "
-              "condiciones actuales del punto seleccionado.",
-        "en": "Crop rotation improves soil health, breaks pest cycles, and can increase overall yield. "
-              "This module evaluates which crop sequences are viable for the current conditions at the selected point."},
-    "rotation_select_primary": {"es": "Seleccione el cultivo principal (Año 1):",
-                                "en": "Select the primary crop (Year 1):"},
-    "rotation_schedule_title": {"es": "📅 Esquema de Rotación Recomendado",
-                                "en": "📅 Recommended Rotation Schedule"},
-    "rotation_benefits_title": {"es": "✅ Beneficios de esta Rotación",
-                                "en": "✅ Benefits of this Rotation"},
-    "rotation_risks_title":    {"es": "⚠️ Riesgos y Consideraciones",
-                                "en": "⚠️ Risks & Considerations"},
-    "rotation_vs_mono_title":  {"es": "📊 Rotación vs. Monocultivo — Comparativa",
-                                "en": "📊 Rotation vs. Monoculture — Comparison"},
-    "rotation_partner_title":  {"es": "🌱 Cultivos Rotacionales Recomendados",
-                                "en": "🌱 Recommended Rotation Crops"},
-    "rotation_viability_title":{"es": "Viabilidad de Rotación",
-                                "en": "Rotation Viability"},
-    "year_label":       {"es": "Año", "en": "Year"},
+        "es": "Esta herramienta combina observaciones de la NASA (SMAP, ECOSTRESS, GPM, SRTM, Landsat) y del IMN "
+              "para comparar al menos tres estrategias rotacionales frente al monocultivo continuo, evaluando la "
+              "regeneración del suelo, el corte biológico de plagas, la retención hídrica y las prioridades del productor.",
+        "en": "This tool synthesizes NASA Earth observations (SMAP, ECOSTRESS, GPM, SRTM, Landsat) and IMN data "
+              "to compare at least three rotation strategies against continuous monoculture, assessing soil health, "
+              "pest disruption, water retention, and farmer priorities."},
+    "rotation_disclaimer": {
+        "es": "ℹ️ <b>Herramienta de Apoyo a la Decisión:</b> Esta plataforma está diseñada para identificar patrones "
+              "y oportunidades agroecológicas, <u>no para reemplazar</u> el criterio tradicional del productor, sus observaciones "
+              "de campo o la asesoría de extensionistas agrícolas locales (MAG / INTA / ICAFE / CORBANA / LAICA).",
+        "en": "ℹ️ <b>Decision-Support Tool:</b> This platform is designed to identify agroecological patterns "
+              "and possibilities, <u>not to replace</u> farmer judgment, local field knowledge, or in-situ agronomic "
+              "extension services (MAG / INTA / ICAFE / CORBANA / LAICA)."},
+    "rotation_select_primary": {"es": "Seleccione el Cultivo Principal para la Rotación:",
+                                "en": "Select Primary Crop for Rotation Analysis:"},
+    "rotation_priority_title": {"es": "🎯 Prioridad Principal del Productor:",
+                                "en": "🎯 Farmer Primary Goal & Priorities:"},
+    "priority_balanced": {"es": "⚖️ Enfoque Equilibrado (Sostenibilidad Global)", "en": "⚖️ Balanced Holistic Approach"},
+    "priority_soil":     {"es": "🌱 Regenerar Suelo & Fijar Nitrógeno",          "en": "🌱 Soil Health & Nitrogen Fixation"},
+    "priority_water":    {"es": "💧 Ahorro Hídrico & Resiliencia a Sequía",       "en": "💧 Water Conservation & Drought Resilience"},
+    "priority_income":   {"es": "💰 Ingresos Suplementarios & Mercado",           "en": "💰 Supplemental Income & Cash Flow"},
+    "priority_pest":     {"es": "🛡️ Control Biológico de Plagas & Nemátodos",    "en": "🛡️ Biological Pest & Nematode Disruption"},
+    "priority_erosion":  {"es": "⛰️ Protección Antierosión en Laderas",           "en": "⛰️ Slope Erosion Mitigation"},
+    "why_suggested_title": {"es": "💡 Por qué se sugiere esta Estrategia",
+                            "en": "💡 Why this Strategy was Suggested"},
+    "evidence_title":      {"es": "🛰️ Evidencia Satelital & Terrestre (NASA + IMN)",
+                            "en": "🛰️ Earth Observation Evidence (NASA + IMN)"},
+    "benefits_title":      {"es": "🌟 Beneficios Agronómicos & Ambientales",
+                            "en": "🌟 Agronomic & Environmental Benefits"},
+    "gaps_title":          {"es": "🔍 Vacíos de Información & Incertidumbre",
+                            "en": "🔍 Information Gaps & Uncertainty"},
+    "farmer_review_title": {"es": "⚠️ Aspectos Críticos para Revisión del Productor",
+                            "en": "⚠️ Critical Points for Local Farmer Review"},
+    "simulation_title":    {"es": "🧪 Simulador de Escenarios Climáticos (What-If)",
+                            "en": "🧪 Climate Scenario Simulator (What-If Analysis)"},
+    "timeline_title":      {"es": "📅 Calendario Agroclimático & Transiciones de Suelo Desnudo (12 Meses)",
+                            "en": "📅 12-Month Agro-Climatic Calendar & Bare-Soil Transitions"},
+    "strategy_comparison_title": {"es": "📊 Comparativa de las Estrategias para este Cultivo",
+                                  "en": "📊 Strategy Comparison for this Crop"},
+    "top_recommended_badge": {"es": "🏆 ESTRATEGIA ÓPTIMA RECOMENDADA", "en": "🏆 TOP RECOMMENDED STRATEGY"},
+    "baseline_badge":        {"es": "📊 LÍNEA BASE (MONOCULTIVO)",       "en": "📊 BASELINE (MONOCULTURE)"},
+    "rotation_schedule_title": {"es": "📅 Secuencia y Prácticas del Esquema",
+                                "en": "📅 Sequence and Agronomic Practices"},
+    "rotation_partner_title":  {"es": "🌱 Especies Rotacionales & Coberturas Utilizadas",
+                                "en": "🌱 Rotational Crops & Cover Species Used"},
+    "rotation_viability_title":{"es": "Viabilidad del Sistema",
+                                "en": "System Viability"},
+    "year_label":       {"es": "Período / Fase", "en": "Period / Phase"},
     "crop_label":       {"es": "Cultivo", "en": "Crop"},
     "benefit_label":    {"es": "Beneficio Principal", "en": "Main Benefit"},
 

@@ -88,6 +88,37 @@ NASA_SAC_2026/
 
 ---
 
+## 🔄 Motor de Rotación de Cultivos & Diversificación Agroecológica
+
+Cumpliendo con los **Objetivos del NASA Space Apps Challenge 2026**, la plataforma incorpora un módulo avanzado de exploración y comparación de estrategias rotacionales para los 5 cultivos clave de Costa Rica (Café, Banano, Caña de Azúcar, Piña y Aguacate):
+
+1. **Comparación de al menos tres estrategias rotacionales:**
+   - **Estrategia 0 (Línea Base / Monocultivo Tradicional):** Práctica continua convencional.
+   - **Estrategia 1 (Agroecológica & Fijación de Nitrógeno):** Regeneración biológica con leguminosas (*Canavalia*, *Mucuna*, *Phaseolus*) y biofumigación con *Crotalaria juncea*.
+   - **Estrategia 2 (Diversificación Comercial & Renta Extra):** Intercalado y rotación con cultivos de mercado y seguridad alimentaria (*Maíz criollo*, *Yuca de exportación*, *Camote*).
+   - **Estrategia 3 (Resiliencia Climática & Conservación Hídrica):** Manto vivo perenne (*Arachis pintoi* - Maní forrajero), barreras vivas de *Vetiver* y pastos profundos (*Brachiaria*).
+
+2. **Los 5 Pilares de Análisis Requeridos por NASA:**
+   - 💡 **Por qué se sugiere / Rationale:** Justificación agroecológica según el clima y suelo local.
+   - 🛰️ **Evidencia Satelital & Terrestre:** Indicadores concretos de **NASA SMAP** (humedad radicular), **ECOSTRESS** (índice de estrés evaporativo ESI y temperatura superficial LST), **GPM DPR** (precipitación y erosividad), **SRTM** (pendiente topográfica) y suelos **IMN**.
+   - 🌟 **Beneficios Ofrecidos:** Fijación de nitrógeno (+40 a +70 kg N/ha), reducción de erosión (>80%), corte de nemátodos y hongos fitopatógenos, e ingresos complementarios.
+   - 🔍 **Vacíos de Información & Incertidumbre:** Transparencia científica sobre nubosidad óptica, variabilidad microclimática y acceso local a semillas.
+   - ⚠️ **Riesgos y Revisión del Productor:** Aspectos agronómicos que requieren el criterio in-situ del agricultor (mano de obra, deshierbe, drenaje).
+
+3. **Alineación con Prioridades del Productor:**
+   - Filtros de prioridad interactivos: *Enfoque Equilibrado*, *Regenerar Suelo & N*, *Ahorro Hídrico*, *Ingresos Extra*, *Control de Plagas*, *Control de Erosión*.
+
+4. **Calendario Agroclimático de 12 Meses & Transiciones de Suelo Desnudo:**
+   - Visualización mes a mes de las precipitaciones GPM, el índice de estrés climático, los períodos críticos de suelo descubierto (bare soil) en monocultivo y la protección continua de la cobertura viva rotacional.
+
+5. **Simulador de Escenarios Climáticos (What-If Analysis):**
+   - Sliders de variación de temperatura ($\Delta T$) y lluvia ($\Delta P$) que demuestran en tiempo real la estabilidad y resiliencia de los sistemas rotacionales frente a sequías (El Niño) o temporales extremos.
+
+6. **Herramienta de Apoyo Centrada en el Agricultor:**
+   - Recordatorio ético de que el sistema apoya y empodera el conocimiento tradicional y la toma de decisiones, sin reemplazar el juicio del agricultor ni la asesoría de extensionistas locales (MAG/INTA/ICAFE/CORBANA/LAICA).
+
+---
+
 ## 🚀 Instrucciones de Ejecución
 
 1. **Activar el entorno virtual**:

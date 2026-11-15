@@ -419,6 +419,265 @@ def create_delta_comparison_chart(crop_res: Dict[str, Any], dark_mode: bool = Fa
     return fig
 
 
+def create_multi_rotation_radar_chart(
+    strategies: List[Dict[str, Any]],
+    primary_crop: str,
+    dark_mode: bool = False,
+    lang: str = "es"
+) -> go.Figure:
+    """Radar chart comparing multiple rotation strategies (including baseline) across 6 dimensions."""
+    theme = get_chart_theme(dark_mode)
+
+    dim_keys = ["soil_health", "pest_control", "water_efficiency", "economic_resilience", "erosion_control", "labor_ease"]
+    if lang == "es":
+        dims = ["Salud del Suelo", "Control de Plagas", "Eficiencia Hídrica", "Resiliencia Económica", "Control de Erosión", "Manejo Operativo"]
+    else:
+        dims = ["Soil Health", "Pest Control", "Water Efficiency", "Economic Resilience", "Erosion Control", "Labor Feasibility"]
+
+    dims_closed = dims + [dims[0]]
+
+    fig = go.Figure()
+
+    palette = [
+        {"line": "#E53935" if not dark_mode else "#EF5350", "fill": "rgba(239, 83, 80, 0.15)", "dash": "dash"},
+        {"line": "#2E7D32" if not dark_mode else "#4CAF50", "fill": "rgba(46, 125, 50, 0.22)", "dash": "solid"},
+        {"line": "#E65100" if not dark_mode else "#FFA726", "fill": "rgba(255, 167, 38, 0.20)", "dash": "solid"},
+        {"line": "#1565C0" if not dark_mode else "#42A5F5", "fill": "rgba(33, 150, 243, 0.20)", "dash": "dot"},
+    ]
+
+    for idx, strat in enumerate(strategies):
+        color_cfg = palette[idx % len(palette)]
+        scores = [strat["radar_scores"].get(k, 50) for k in dim_keys]
+        scores_closed = scores + [scores[0]]
+        strat_name = strat["name_es"] if lang == "es" else strat["name_en"]
+        short_name = strat_name.split(":")[1].strip() if ":" in strat_name else strat_name
+
+        fig.add_trace(go.Scatterpolar(
+            r=scores_closed,
+            theta=dims_closed,
+            fill="toself" if idx in [0, 1] else "none",
+            fillcolor=color_cfg["fill"],
+            line=dict(color=color_cfg["line"], width=3 if strat.get("is_top_recommendation") else 2, dash=color_cfg["dash"]),
+            name=f"{strat.get('icon', '🌱')} {short_name}",
+            hovertemplate="<b>%{theta}</b>: %{r}%<extra></extra>",
+        ))
+
+    fig.update_layout(
+        polar=dict(
+            radialaxis=dict(
+                visible=True,
+                range=[0, 100],
+                showticklabels=True,
+                ticksuffix="%",
+                gridcolor=theme["grid_color"],
+                color=theme["text_color"],
+                tickfont=dict(color=theme["text_color"]),
+            ),
+            angularaxis=dict(gridcolor=theme["grid_color"], color=theme["text_color"], tickfont=dict(color=theme["text_color"])),
+            bgcolor=theme["plot_bg"],
+        ),
+        title=dict(
+            text=f"<b>{'Comparativa Multidimensional de Estrategias' if lang == 'es' else 'Multi-Strategy Agronomic Comparison'} — {primary_crop}</b>",
+            font=dict(color=theme["text_color"], size=13),
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.04,
+            xanchor="center",
+            x=0.5,
+            font=dict(color=theme["text_color"], size=10.5)
+        ),
+        margin=dict(l=40, r=40, t=65, b=25),
+        paper_bgcolor=theme["paper_bg"],
+        height=390,
+    )
+    return fig
+
+
+def create_vulnerability_timeline_chart(
+    calendar_data: List[Dict[str, Any]],
+    dark_mode: bool = False,
+    lang: str = "es"
+) -> go.Figure:
+    """12-Month Agro-Climatic Vulnerability & Bare-Field Transition Calendar chart."""
+    theme = get_chart_theme(dark_mode)
+
+    months = [item["month_es"] if lang == "es" else item["month_en"] for item in calendar_data]
+    precip = [item["precipitation_mm"] for item in calendar_data]
+    stress = [item["climate_stress_index"] for item in calendar_data]
+    bare_mono = [item["bare_soil_monoculture_index"] for item in calendar_data]
+    rot_cover = [item["rotational_cover_index"] for item in calendar_data]
+
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+
+    # Bar: Monthly Precipitation (mm)
+    fig.add_trace(
+        go.Bar(
+            x=months,
+            y=precip,
+            name="Lluvia GPM (mm)" if lang == "es" else "GPM Rainfall (mm)",
+            marker_color="rgba(33, 150, 243, 0.35)" if not dark_mode else "rgba(66, 165, 245, 0.40)",
+            marker_line=dict(color="#1976D2", width=1),
+            hovertemplate="<b>%{x}</b>: %{y} mm<extra></extra>",
+        ),
+        secondary_y=False,
+    )
+
+    # Line: Climate Stress Index
+    fig.add_trace(
+        go.Scatter(
+            x=months,
+            y=stress,
+            name="Estrés Climático" if lang == "es" else "Climate Stress Index",
+            line=dict(color="#E53935" if not dark_mode else "#EF5350", width=2.5),
+            mode="lines+markers",
+            marker=dict(size=6),
+            hovertemplate="<b>%{x} Estrés</b>: %{y}%<extra></extra>",
+        ),
+        secondary_y=True,
+    )
+
+    # Line: Bare Soil Risk (Monoculture)
+    fig.add_trace(
+        go.Scatter(
+            x=months,
+            y=bare_mono,
+            name="Suelo Desnudo (Monocultivo)" if lang == "es" else "Bare Soil (Monoculture)",
+            line=dict(color="#FB8C00" if not dark_mode else "#FFA726", width=2, dash="dash"),
+            mode="lines+markers",
+            marker=dict(size=5),
+            hovertemplate="<b>%{x} Suelo Expuesto</b>: %{y}%<extra></extra>",
+        ),
+        secondary_y=True,
+    )
+
+    # Line: Rotational Living Soil Cover
+    fig.add_trace(
+        go.Scatter(
+            x=months,
+            y=rot_cover,
+            name="Cobertura Viva (Rotación)" if lang == "es" else "Living Cover (Rotation)",
+            line=dict(color="#2E7D32" if not dark_mode else "#4CAF50", width=3),
+            mode="lines+markers",
+            marker=dict(size=6),
+            hovertemplate="<b>%{x} Cobertura Rotacional</b>: %{y}%<extra></extra>",
+        ),
+        secondary_y=True,
+    )
+
+    fig.update_layout(
+        title=dict(
+            text=f"<b>{'Calendario de Vulnerabilidad & Transiciones (12 Meses)' if lang == 'es' else '12-Month Agro-Climatic Vulnerability & Field Transitions'}</b>",
+            font=dict(color=theme["text_color"], size=13),
+        ),
+        paper_bgcolor=theme["paper_bg"],
+        plot_bgcolor=theme["plot_bg"],
+        font=dict(color=theme["text_color"], family=theme["font_family"]),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.04,
+            xanchor="center",
+            x=0.5,
+            font=dict(color=theme["text_color"], size=10.5),
+        ),
+        margin=dict(l=45, r=45, t=65, b=30),
+        height=360,
+    )
+
+    fig.update_xaxes(
+        gridcolor=theme["grid_color"],
+        color=theme["text_color"],
+        tickfont=dict(color=theme["text_color"]),
+    )
+    fig.update_yaxes(
+        title_text="Lluvia / Rain (mm)",
+        secondary_y=False,
+        gridcolor=theme["grid_color"],
+        color=theme["text_color"],
+        tickfont=dict(color=theme["text_color"]),
+    )
+    fig.update_yaxes(
+        title_text="Índice / Index (0-100%)",
+        secondary_y=True,
+        range=[0, 105],
+        showgrid=False,
+        ticksuffix="%",
+        color=theme["text_color"],
+        tickfont=dict(color=theme["text_color"]),
+    )
+    return fig
+
+
+def create_climate_scenario_chart(
+    strategies: List[Dict[str, Any]],
+    primary_crop: str,
+    delta_temp: float = 0.0,
+    delta_precip: float = 0.0,
+    dark_mode: bool = False,
+    lang: str = "es"
+) -> go.Figure:
+    """Compares resilience of strategies under current conditions vs simulated climate stress."""
+    theme = get_chart_theme(dark_mode)
+
+    names = []
+    scores = []
+    colors = []
+
+    for s in strategies:
+        s_name = s["name_es"] if lang == "es" else s["name_en"]
+        short = s_name.split(":")[0].replace("Estrategia", "Est.").replace("Strategy", "Strat.") + ": " + (s_name.split(":")[1].strip()[:24] if ":" in s_name else s_name[:24])
+        names.append(f"{s.get('icon', '🌱')} {short}")
+        scores.append(s["viability_score"])
+
+        if s.get("is_baseline"):
+            colors.append("#EF5350" if dark_mode else "#E53935")
+        elif s.get("is_top_recommendation"):
+            colors.append("#4CAF50" if dark_mode else "#2E7D32")
+        else:
+            colors.append("#42A5F5" if dark_mode else "#1565C0")
+
+    fig = go.Figure(
+        go.Bar(
+            x=names,
+            y=scores,
+            text=[f"{v}%" for v in scores],
+            textposition="auto",
+            marker_color=colors,
+            marker_line=dict(color=theme["border_color"], width=1),
+            hovertemplate="<b>%{x}</b><br>Viabilidad: %{y}%<extra></extra>",
+        )
+    )
+
+    scenario_txt = f"(ΔT: {'+' if delta_temp >= 0 else ''}{delta_temp:.1f}°C | ΔP: {'+' if delta_precip >= 0 else ''}{delta_precip:.0f}%)" if (delta_temp != 0 or delta_precip != 0) else "(Línea Base Actual / Current Baseline)"
+
+    fig.update_layout(
+        title=dict(
+            text=f"<b>{'Viabilidad Bajo Escenario Climático' if lang == 'es' else 'Viability Under Climate Scenario'} {scenario_txt}</b>",
+            font=dict(color=theme["text_color"], size=13),
+        ),
+        paper_bgcolor=theme["paper_bg"],
+        plot_bgcolor=theme["plot_bg"],
+        font=dict(color=theme["text_color"], family=theme["font_family"]),
+        yaxis=dict(
+            range=[0, 105],
+            ticksuffix="%",
+            gridcolor=theme["grid_color"],
+            color=theme["text_color"],
+            tickfont=dict(color=theme["text_color"]),
+        ),
+        xaxis=dict(
+            gridcolor=theme["grid_color"],
+            color=theme["text_color"],
+            tickfont=dict(color=theme["text_color"], size=10),
+        ),
+        margin=dict(l=35, r=20, t=50, b=30),
+        height=280,
+    )
+    return fig
+
+
 def create_rotation_radar_chart(comparison_data: Dict[str, Any], primary_crop: str, dark_mode: bool = False, lang: str = "es") -> go.Figure:
     """Radar chart comparing Monoculture vs Rotation across 5 agronomic dimensions."""
     theme = get_chart_theme(dark_mode)

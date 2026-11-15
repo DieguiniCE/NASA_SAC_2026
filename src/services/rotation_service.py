@@ -1,226 +1,1130 @@
 """
 Crop Rotation & Agroecological Diversification Service.
 Analyzes viability and benefits of crop rotations for Costa Rican agricultural zones.
-Evaluates rotation sequences against monoculture based on soil health, pest disruption,
-water-balance resilience, and erosion mitigation.
+Evaluates multiple rotation strategies (including baseline monoculture) against
+soil health, biological pest disruption, water-balance resilience, erosion mitigation,
+and farmer priorities, using NASA Earth observations and IMN data.
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
+import math
 
 
-# Secondary rotation partners and cover crops widely used in Costa Rica
-ROTATION_PARTNERS = {
+# ==============================================================================
+# 1. ROTATIONAL PARTNER CROPS & COVER SPECIES CATALOG (COSTA RICA)
+# ==============================================================================
+
+ROTATION_PARTNERS: Dict[str, Dict[str, Any]] = {
     "beans_legumes": {
-        "name_es": "Frijol / Leguminosas de Cobertura (Phaseolus / Canavalia)",
-        "name_en": "Beans / Cover Legumes (Phaseolus / Canavalia)",
+        "id": "beans_legumes",
+        "name_es": "Frijol / Canavalia (Phaseolus vulgaris / Canavalia ensiformis)",
+        "name_en": "Beans / Jack Bean (Phaseolus vulgaris / Canavalia ensiformis)",
         "icon": "🫘",
-        "category": "Fijación Biológica de Nitrógeno",
+        "category_es": "Fijación Biológica de Nitrógeno",
         "category_en": "Biological Nitrogen Fixation",
-        "water_needs": "Bajo a moderado (300-500 mm/ciclo)",
+        "water_needs_es": "Bajo a moderado (300-500 mm/ciclo)",
         "water_needs_en": "Low to moderate (300-500 mm/cycle)",
-        "soil_benefit": "+30-50 kg N/ha fijado biológicamente; incrementa materia orgánica.",
-        "soil_benefit_en": "+30-50 kg N/ha biologically fixed; increases organic matter.",
-        "pest_break": "Rompe ciclo de nemátodos y hongos del suelo en monocultivos.",
-        "pest_break_en": "Disrupts nematode and soil-borne fungal cycles in monoculture.",
-        "optimal_elev": (0, 1600),
+        "soil_benefit_es": "+40-60 kg N/ha fijado biológicamente; incrementa materia orgánica y actividad microbiana.",
+        "soil_benefit_en": "+40-60 kg N/ha biologically fixed; increases organic matter and microbial activity.",
+        "pest_break_es": "Rompe ciclo de hongos fitopatógenos y nemátodos del suelo.",
+        "pest_break_en": "Disrupts soil fungal pathogens and parasitic nematode cycles.",
+        "market_potential_es": "Alto valor comercial directo para consumo local (grano) o forraje proteico.",
+        "market_potential_en": "High commercial value for local market grain or high-protein forage.",
+        "optimal_elev": (0, 1800),
         "ideal_temp": (18, 28),
-    },
-    "maize_cereal": {
-        "name_es": "Maíz / Sorgo (Zea mays / Sorghum)",
-        "name_en": "Maize / Sorghum (Zea mays / Sorghum)",
-        "icon": "🌽",
-        "category": "Biomasa & Micorrizas",
-        "category_en": "Biomass & Mycorrhizae",
-        "water_needs": "Moderado (500-750 mm/ciclo)",
-        "water_needs_en": "Moderate (500-750 mm/cycle)",
-        "soil_benefit": "Aporte masivo de rastrojo superficial (mulch), previene erosión por impacto pluvial.",
-        "soil_benefit_en": "Massive surface mulch contribution, prevents rainfall splash erosion.",
-        "pest_break": "No comparte plagas mayores con café o banano.",
-        "pest_break_en": "Does not share major pests with coffee or banana.",
-        "optimal_elev": (0, 1400),
-        "ideal_temp": (20, 30),
-    },
-    "cassava_roots": {
-        "name_es": "Yuca / Camote (Manihot esculenta / Ipomoea)",
-        "name_en": "Cassava / Sweet Potato (Manihot esculenta / Ipomoea)",
-        "icon": "🍠",
-        "category": "Descompactación Radicular",
-        "category_en": "Root Decompaction",
-        "water_needs": "Tolerante a sequía estacional (600-1200 mm)",
-        "water_needs_en": "Drought tolerant (600-1200 mm)",
-        "soil_benefit": "Raíces profundas que rompen piso de arado en suelos compactados.",
-        "soil_benefit_en": "Deep roots that penetrate hardpan in compacted soils.",
-        "pest_break": "Excelente rotación posterior a piña o caña.",
-        "pest_break_en": "Excellent rotation following pineapple or sugarcane.",
-        "optimal_elev": (0, 1000),
-        "ideal_temp": (22, 32),
+        "tolerable_moisture": (0.18, 0.40),
     },
     "green_manure": {
-        "name_es": "Abono Verde / Crotalaria (Crotalaria juncea / Mucuna)",
-        "name_en": "Green Manure / Crotalaria (Crotalaria juncea / Mucuna)",
+        "id": "green_manure",
+        "name_es": "Crotalaria / Mucuna (Crotalaria juncea / Mucuna pruriens)",
+        "name_en": "Sunn Hemp / Velvet Bean (Crotalaria juncea / Mucuna pruriens)",
         "icon": "🌿",
-        "category": "Biofumigación & Nemátodos",
+        "category_es": "Biofumigación & Nemátodos",
         "category_en": "Biofumigation & Nematodes",
-        "water_needs": "Bajo (rápido establecimiento en 60-90 días)",
-        "water_needs_en": "Low (rapid establishment in 60-90 days)",
-        "soil_benefit": "Control natural de nemátodos agalladores (Meloidogyne spp.); fija N.",
-        "soil_benefit_en": "Natural control of root-knot nematodes (Meloidogyne spp.); fixes N.",
-        "pest_break": "Efecto biofumigante comprobado contra patógenos del suelo.",
-        "pest_break_en": "Proven biofumigation effect against soil-borne pathogens.",
+        "water_needs_es": "Bajo (rápido establecimiento en 60-90 días, alta eficiencia hídrica)",
+        "water_needs_en": "Low (fast 60-90 day establishment, high water-use efficiency)",
+        "soil_benefit_es": "Aporte masivo de biomasa aérea (6-10 t/ha MS), biofumigación contra nemátodos agalladores.",
+        "soil_benefit_en": "Massive above-ground biomass (6-10 t/ha DM), natural biofumigation against root-knot nematodes.",
+        "pest_break_es": "Alcaloides pirrolizidínicos que erradican nemátodos (Meloidogyne, Pratylenchus).",
+        "pest_break_en": "Pyrrolizidine alkaloids that eradicate parasitic nematodes (Meloidogyne, Pratylenchus).",
+        "market_potential_es": "Ahorro directo en agroquímicos y nematicidas sintéticos ($250-400/ha).",
+        "market_potential_en": "Direct savings on synthetic nematicides and fertilizers ($250-400/ha).",
+        "optimal_elev": (0, 1900),
+        "ideal_temp": (18, 32),
+        "tolerable_moisture": (0.15, 0.42),
+    },
+    "maize_cereal": {
+        "id": "maize_cereal",
+        "name_es": "Maíz Criollo / Sorgo Forrajero (Zea mays / Sorghum bicolor)",
+        "name_en": "Native Maize / Forage Sorghum (Zea mays / Sorghum bicolor)",
+        "icon": "🌽",
+        "category_es": "Biomasa & Cobertura de Mulch",
+        "category_en": "Biomass & Mulch Armor",
+        "water_needs_es": "Moderado (450-700 mm/ciclo)",
+        "water_needs_en": "Moderate (450-700 mm/cycle)",
+        "soil_benefit_es": "Rastrojo lignificado duradero (mulch) que previene el sellado superficial y la evaporación.",
+        "soil_benefit_en": "Durable lignified mulch preventing soil crusting and evaporative moisture loss.",
+        "pest_break_es": "No hospeda las principales enfermedades del cafeto, banano ni piña.",
+        "pest_break_en": "Does not host primary diseases of coffee, banana, or pineapple.",
+        "market_potential_es": "Venta de grano para el mercado nacional o alimento balanceado de aves/cerdos.",
+        "market_potential_en": "Grain sales to local markets or balanced feed for poultry/livestock.",
+        "optimal_elev": (0, 1600),
+        "ideal_temp": (19, 31),
+        "tolerable_moisture": (0.18, 0.38),
+    },
+    "cassava_roots": {
+        "id": "cassava_roots",
+        "name_es": "Yuca Valencia / Camote (Manihot esculenta / Ipomoea batatas)",
+        "name_en": "Cassava / Sweet Potato (Manihot esculenta / Ipomoea batatas)",
+        "icon": "🍠",
+        "category_es": "Descompactación Radicular & Renta",
+        "category_en": "Root Decompaction & Cash Flow",
+        "water_needs_es": "Tolerante a sequía estacional (600-1100 mm)",
+        "water_needs_en": "Drought tolerant (600-1100 mm)",
+        "soil_benefit_es": "Tubérculos expansivos que descompactan horizontes densos y mejoran la infiltración.",
+        "soil_benefit_en": "Expanding root tubers decompressing dense horizons and improving infiltration.",
+        "pest_break_es": "Excelente cultivo de corte posterior a monocultivos de piña o caña.",
+        "pest_break_en": "Outstanding transition crop following pineapple or sugar cane monoculture.",
+        "market_potential_es": "Cultivo de alta demanda nacional y de exportación a mercados caribeños y EEUU.",
+        "market_potential_en": "High domestic demand and major export crop to Caribbean and US markets.",
+        "optimal_elev": (0, 1100),
+        "ideal_temp": (21, 33),
+        "tolerable_moisture": (0.18, 0.40),
+    },
+    "forage_peanut": {
+        "id": "forage_peanut",
+        "name_es": "Maní Forrajero (Arachis pintoi)",
+        "name_en": "Forage Peanut (Arachis pintoi)",
+        "icon": "🥜",
+        "category_es": "Cobertura Viva Perenne & Antierosión",
+        "category_en": "Perennial Living Cover & Anti-Erosion",
+        "water_needs_es": "Moderado (resiste períodos secos mediante estolones subterráneos)",
+        "water_needs_en": "Moderate (endures dry spells through subterranean stolons)",
+        "soil_benefit_es": "Manto perenne que amortigua lluvia torrencial, fija nitrógeno y reduce temp. de suelo en 3-5°C.",
+        "soil_benefit_en": "Perennial mat buffering torrential rainfall, fixing N, and lowering soil temp by 3-5°C.",
+        "pest_break_es": "Compite agresivamente contra malezas gramíneas y hospeda micorrizas benéficas.",
+        "pest_break_en": "Aggressively suppresses noxious weeds and hosts beneficial mycorrhizal fungi.",
+        "market_potential_es": "Excelente pastoreo para ganado lechero o producción de semilla certificada.",
+        "market_potential_en": "Excellent grazing for dairy cattle or certified seed production.",
         "optimal_elev": (0, 1800),
-        "ideal_temp": (17, 30),
+        "ideal_temp": (18, 30),
+        "tolerable_moisture": (0.20, 0.45),
+    },
+    "vetiver_brachiaria": {
+        "id": "vetiver_brachiaria",
+        "name_es": "Zacate Vetiver / Brachiaria (Chrysopogon zizanioides / Urochloa)",
+        "name_en": "Vetiver / Brachiaria Grass (Chrysopogon zizanioides / Urochloa)",
+        "icon": "🌾",
+        "category_es": "Anclaje de Laderas & Restauración Estructural",
+        "category_en": "Slope Anchoring & Structural Restoration",
+        "water_needs_es": "Extremadamente tolerante a sequías e inundaciones temporales",
+        "water_needs_en": "Extremely tolerant of both droughts and temporary floods",
+        "soil_benefit_es": "Raíces profundas de hasta 3 metros que anclan taludes y aumentan macroporosidad.",
+        "soil_benefit_en": "Massive root system up to 3m deep anchoring steep slopes and boosting macroporosity.",
+        "pest_break_es": "Corta la persistencia de hongos específicos de dicotiledóneas y piña.",
+        "pest_break_en": "Breaks persistence of broadleaf and bromeliad-specific soil fungi.",
+        "market_potential_es": "Forraje voluminoso para ganado en verano o producción de barreras vivas.",
+        "market_potential_en": "Bulk forage for livestock during dry spells or living contour barrier material.",
+        "optimal_elev": (0, 2200),
+        "ideal_temp": (16, 34),
+        "tolerable_moisture": (0.15, 0.45),
+    },
+    "cowpea_pigeonpea": {
+        "id": "cowpea_pigeonpea",
+        "name_es": "Gandul / Frijol Caupí (Cajanus cajan / Vigna unguiculata)",
+        "name_en": "Pigeon Pea / Cowpea (Cajanus cajan / Vigna unguiculata)",
+        "icon": "🫛",
+        "category_es": "Raíz Pivotante Profunda & Tolerancia a Sequía",
+        "category_en": "Deep Taproot & Extreme Drought Tolerance",
+        "water_needs_es": "Muy bajo a bajo (350-600 mm, excelente tolerancia al estrés hídrico)",
+        "water_needs_en": "Very low to low (350-600 mm, outstanding drought stress tolerance)",
+        "soil_benefit_es": "Raíz pivotante leñosa que rompe capas compactadas y extrae fósforo insoluble.",
+        "soil_benefit_en": "Woody taproot piercing compacted layers and unlocking insoluble subsoil phosphorus.",
+        "pest_break_es": "No comparte nematodos mayores con el banano ni la caña de azúcar.",
+        "pest_break_en": "Does not share major nematodes with banana or sugar cane.",
+        "market_potential_es": "Grano comestible de alta proteína y leña fina para secado agroindustrial.",
+        "market_potential_en": "High-protein edible grain and biomass for rural agro-processing.",
+        "optimal_elev": (0, 1500),
+        "ideal_temp": (20, 34),
+        "tolerable_moisture": (0.15, 0.35),
     },
 }
 
 
-# Rotation plans for the 5 target crops in GEMINI.md
-CROP_ROTATION_PLANS = {
-    "Coffee": {
-        "rotation_type": "Agroforestal & Cobertura Viva (Agroforestry & Living Mulch)",
-        "schedule": [
-            {"year": "Año 1", "year_en": "Year 1", "phase": "☕ Café Productivo + Poda y Deshije", "phase_en": "Productive Coffee + Pruning", "role": "Cultivo Principal / Cash Crop"},
-            {"year": "Año 2", "year_en": "Year 2", "phase": "🫘 Intercalado con Frijol Tapado / Canavalia", "phase_en": "Intercropped with Beans / Canavalia", "role": "Fijación de Nitrógeno y control de malezas"},
-            {"year": "Año 3", "year_en": "Year 3", "phase": "🌿 Abono Verde (Crotalaria) en calles de café", "phase_en": "Green Manure (Crotalaria) in alleys", "role": "Control biológico de nemátodos y mulch orgánico"},
-            {"year": "Año 4", "year_en": "Year 4", "phase": "☕ Renovación de tejido / Cosecha plena", "phase_en": "Tissue renewal / Full harvest", "role": "Pico de productividad con suelo regenerado"},
-        ],
-        "primary_partner": "beans_legumes",
-        "secondary_partner": "green_manure",
-        "benefits_es": [
-            "Ahorro de hasta un 30% en fertilización nitrogenada sintética mediante simbiosis Rhizobium.",
-            "Supresión natural de nemátodos agalladores y de lesiones en raíces de cafeto.",
-            "Protección contra erosión laminar en laderas pronunciadas comunes en zonas cafetaleras (Tarrazú, Naranjo, Turrialba).",
-            "Mantenimiento de humedad en época seca (Veranillo de San Juan).",
-        ],
-        "benefits_en": [
-            "Saves up to 30% in synthetic nitrogen fertilizer through Rhizobium symbiosis.",
-            "Natural suppression of root-knot and lesion nematodes in coffee roots.",
-            "Protection against sheet erosion on steep slopes typical of coffee areas (Tarrazú, Naranjo, Turrialba).",
-            "Moisture retention during dry spells (Midsummer drought / Veranillo).",
-        ],
-        "risks_es": [
-            "Evitar especies trepadoras agresivas que puedan asfixiar las ramas productivas de café.",
-            "Monitorear humedad excesiva que propicie Ojo de Gallo (Mycena citricolor) en altitudes > 1200 m.",
-        ],
-        "risks_en": [
-            "Avoid aggressive climbing vines that could smother productive coffee branches.",
-            "Monitor excess humidity that could trigger American Leaf Spot (Mycena citricolor) above 1200 m.",
-        ],
-    },
-    "Banana": {
-        "rotation_type": "Rotación Post-Ciclo & Barbecho Mejorado (Fallow & Root Regeneration)",
-        "schedule": [
-            {"year": "Año 1-2", "year_en": "Year 1-2", "phase": "🍌 Banano Ciclo 1 & Retoños (Ratoon)", "phase_en": "Banana Cycle 1 & Ratoons", "role": "Extracción y producción alta"},
-            {"year": "Año 3", "year_en": "Year 3", "phase": "🌽 Maíz de Cobertura / Crotalaria", "phase_en": "Cover Maize / Crotalaria", "role": "Corte de ciclo biológico de Sigatoka y nemátodos"},
-            {"year": "Año 4", "year_en": "Year 4", "phase": "🫘 Leguminosa rastrera (Mucuna pruriens)", "phase_en": "Trailing legume (Mucuna pruriens)", "role": "Restitución de potasio y estructura de suelo aluvial"},
-        ],
-        "primary_partner": "green_manure",
-        "secondary_partner": "maize_cereal",
-        "benefits_es": [
-            "Disrupción del inóculo de hongos del suelo (Fusarium oxysporum / Mal de Panamá y Radopholus similis).",
-            "Reestructuración de horizontes compactados por maquinaria pesada y tránsito continuo de cosecha.",
-            "Aporte masivo de biomasa vegetal que amortigua el exceso hídrico en el Caribe (Limón / Sarapiquí).",
-        ],
-        "benefits_en": [
-            "Disruption of soil fungal inoculum (Fusarium oxysporum / Panama Disease and Radopholus similis).",
-            "Restructuring of horizons compacted by heavy machinery and continuous harvest traffic.",
-            "Massive plant biomass contribution buffering excess rainfall in the Caribbean (Limón / Sarapiquí).",
-        ],
-        "risks_es": [
-            "Drenaje deficiente puede causar pudrición de rizomas de cultivos rotacionales en llanuras aluviales.",
-        ],
-        "risks_en": [
-            "Poor drainage may cause root rot in rotational crops on alluvial floodplains.",
-        ],
-    },
-    "Sugar Cane": {
-        "rotation_type": "Rotación Entre Socas & Leguminosa Estacional (Inter-Ratoon Rotation)",
-        "schedule": [
-            {"year": "Año 1-4", "year_en": "Year 1-4", "phase": "🌾 Caña de Azúcar (Plantilla y 3 Socas)", "phase_en": "Sugar Cane (Plant cane and 3 ratoons)", "role": "Cosecha comercial sucesiva"},
-            {"year": "Año 5 (Entrezafra)", "year_en": "Year 5 (Inter-season)", "phase": "🫘 Soya o Frijol Caupí de ciclo corto (90 días)", "phase_en": "Short-cycle Soy or Cowpea (90 days)", "role": "Recuperación de fertilidad y descanso del suelo"},
-            {"year": "Año 5 (Siembra)", "year_en": "Year 5 (Planting)", "phase": "🌾 Nueva Plantilla de Caña", "phase_en": "New Cane Planting", "role": "Reinicio de ciclo con vigor incrementado"},
-        ],
-        "primary_partner": "beans_legumes",
-        "secondary_partner": "green_manure",
-        "benefits_es": [
-            "Rompe la fatiga del suelo tras múltiples socas y reduce infestación de malezas gramíneas.",
-            "Aporta hasta 60 kg N/ha disponible para la nueva plantilla de caña.",
-            "Disminuye la incidencia del taladrador del tallo (Diatraea spp.).",
-        ],
-        "benefits_en": [
-            "Breaks soil fatigue after multiple ratoon cycles and reduces grass weed infestation.",
-            "Provides up to 60 kg N/ha available for the new cane planting.",
-            "Decreases incidence of sugarcane borer (Diatraea spp.).",
-        ],
-        "risks_es": [
-            "Ventana corta entre zafra y lluvias requiere variedades de leguminosas de maduración temprana.",
-        ],
-        "risks_en": [
-            "Short window between harvest and rainy season requires early-maturing legume varieties.",
-        ],
-    },
-    "Pineapple": {
-        "rotation_type": "Biofumigación Post-Rastrojo & Desintoxicación (Biofumigation & Detox)",
-        "schedule": [
-            {"year": "Año 1-2", "year_en": "Year 1-2", "phase": "🍍 Piña (Cosecha principal y cosecha inducida)", "phase_en": "Pineapple (Main crop and ratoon harvest)", "role": "Extracción intensiva de nutrientes"},
-            {"year": "Año 3 (Fase 1)", "year_en": "Year 3 (Phase 1)", "phase": "🌿 Incorporación de rastrojo + Crotalaria juncea", "phase_en": "Stubble incorporation + Crotalaria juncea", "role": "Biofumigación y control de Symphylidos"},
-            {"year": "Año 3 (Fase 2)", "year_en": "Year 3 (Phase 2)", "phase": "🍠 Yuca / Camote o Pasto Brachiaria", "phase_en": "Cassava / Sweet Potato or Brachiaria grass", "role": "Descompactación y lavado biológico de agroquímicos"},
-            {"year": "Año 4", "year_en": "Year 4", "phase": "🍍 Nueva siembra de Piña", "phase_en": "New Pineapple planting", "role": "Suelo regenerado sin acumulamiento de nemátodos"},
-        ],
-        "primary_partner": "green_manure",
-        "secondary_partner": "cassava_roots",
-        "benefits_es": [
-            "Solución biológica al grave problema de sinfilidos (Scutigerella) y nemátodos en piñeras.",
-            "Mejora la permeabilidad en suelos Ultisoles arcillosos de la Zona Norte y Huetar Norte.",
-            "Reduce la acidez residual y la fitotoxicidad de herbicidas aplicados en ciclos anteriores.",
-        ],
-        "benefits_en": [
-            "Biological solution to the severe symphylid (Scutigerella) and nematode issue in pineapple fields.",
-            "Improves permeability in acidic Ultisol clays of Northern Costa Rica (San Carlos / Upala).",
-            "Reduces residual acidity and phytotoxicity from herbicides applied in previous cycles.",
-        ],
-        "risks_es": [
-            "El rastrojo de piña genera gran volumen de acidez; requiere adecuada aireación al incorporar.",
-        ],
-        "risks_en": [
-            "Pineapple stubble generates large acidic volume; requires adequate aeration during tillage.",
-        ],
-    },
-    "Avocado": {
-        "rotation_type": "Agrosilvicultura & Cobertura Viva Anti-Phytophthora (Agroforestry Living Cover)",
-        "schedule": [
-            {"year": "Permanente", "year_en": "Permanent", "phase": "🥑 Aguacate Hass / Antillano", "phase_en": "Avocado Hass / West Indian", "role": "Cultivo perenne frutal"},
-            {"year": "Estacional", "year_en": "Seasonal", "phase": "🫘 Cobertura viva de Maní Forrajero (Arachis pintoi)", "phase_en": "Living cover of Forage Peanut (Arachis pintoi)", "role": "Protección contra pudrición radicular"},
-            {"year": "Intermitente", "year_en": "Intermittent", "phase": "🌽 Siembra en calles anchas de Maíz criollo", "phase_en": "Wide-alley cropping with native Maize", "role": "Ingreso extra en etapa juvenil del huerto"},
-        ],
-        "primary_partner": "beans_legumes",
-        "secondary_partner": "maize_cereal",
-        "benefits_es": [
-            "La cobertura viva compite contra el patógeno Phytophthora cinnamomi (tristeza del aguacate).",
-            "Evita el salpicado de lluvia sobre los troncos que propaga antracnosis y hongos vasculares.",
-            "Disminuye la temperatura del suelo en verano en 2-4°C, protegiendo las raíces superficiales.",
-        ],
-        "benefits_en": [
-            "Living cover actively competes against Phytophthora cinnamomi root rot.",
-            "Prevents rain-splash on tree trunks that spreads anthracnose and vascular fungi.",
-            "Lowers summer soil surface temperatures by 2-4°C, protecting feeder roots.",
-        ],
-        "risks_es": [
-            "No debe competir por luz ni trepar al tronco del árbol de aguacate.",
-            "Asegurar drenaje excepcional en época de tormentas tropicales.",
-        ],
-        "risks_en": [
-            "Must not compete for light or climb the avocado tree trunk.",
-            "Ensure exceptional drainage during tropical storm events.",
-        ],
-    },
+# ==============================================================================
+# 2. COMPREHENSIVE 3+ STRATEGY REPOSITORY FOR ALL 5 COSTA RICAN CROPS
+# ==============================================================================
+# Fulfills NASA Space Apps Challenge objective:
+# "You may compare at least three rotation strategies, including the existing rotation.
+#  For each strategy, you may explain why it was suggested, what evidence supports it,
+#  what benefits it may offer, where information gaps exist, and any risks that would
+#  need local review by farmers or agricultural experts."
+
+MULTI_STRATEGY_CATALOG: Dict[str, List[Dict[str, Any]]] = {
+    "Coffee": [
+        {
+            "strategy_id": "coffee_baseline",
+            "is_baseline": True,
+            "name_es": "Estrategia 0: Monocultivo Tradicional (Línea Base)",
+            "name_en": "Strategy 0: Traditional Monoculture (Baseline)",
+            "icon": "☕",
+            "tag_es": "Práctica Existente / Monocultivo Continuo",
+            "tag_en": "Existing Practice / Continuous Monoculture",
+            "primary_goal": "income",
+            "schedule": [
+                {"period_es": "Año 1-20+", "period_en": "Year 1-20+", "practice_es": "Café a pleno sol o sombra ligera sin cobertura", "practice_en": "Full-sun or low-shade coffee with bare alleys", "role_es": "Monocultivo continuo con uso intensivo de herbicidas y fertilizantes sintéticos", "role_en": "Continuous monoculture with heavy synthetic fertilizer and herbicide usage"}
+            ],
+            "partners": [],
+            "why_suggested_es": "Representa el sistema convencional de muchas fincas cafetaleras en Tarrazú, Naranjo y Coto Brus. Prioriza la máxima densidad de plantas de café a corto plazo.",
+            "why_suggested_en": "Represents the conventional system in many coffee farms across Tarrazú, Naranjo, and Coto Brus. Prioritizes short-term coffee bush density.",
+            "evidence_supporting_es": "Históricamente genera ingresos concentrados en época de cosecha, pero los datos de satélite SMAP y ECOSTRESS revelan estrés térmico severo durante el Veranillo y escorrentía en laderas SRTM.",
+            "evidence_supporting_en": "Historically yields concentrated harvest income, but SMAP and ECOSTRESS data indicate severe heat stress during midsummer drought and runoff on SRTM slopes.",
+            "benefits_es": [
+                "Simplicidad operativa al manejar un solo cultivo sin requerir destrezas adicionales.",
+                "Concentración total de mano de obra en la recolección en los meses pico (Dic-Feb).",
+            ],
+            "benefits_en": [
+                "Operational simplicity managing a single cash crop without extra field practices.",
+                "Labor entirely concentrated on harvest during peak months (Dec-Feb).",
+            ],
+            "information_gaps_es": "Falta de monitoreo in-situ sobre la pérdida progresiva de materia orgánica y compactación por pisoteo de recolectores.",
+            "information_gaps_en": "Lack of in-situ monitoring regarding progressive soil organic matter depletion and harvest foot-traffic compaction.",
+            "risks_and_farmer_review_es": [
+                "Erosión hídrica acelerada en pendientes mayores al 15% (comunes en Los Santos).",
+                "Alta vulnerabilidad a brotes de Roya (Hemileia vastatrix) y Ojo de Gallo al debilitarse el suelo.",
+                "Dependencia crítica de fertilizantes nitrogenados importados de alto costo.",
+            ],
+            "risks_and_farmer_review_en": [
+                "Accelerated water erosion on slopes exceeding 15% (common in Los Santos).",
+                "High vulnerability to Coffee Rust (Hemileia vastatrix) and American Leaf Spot as soil degrades.",
+                "Critical dependence on expensive imported synthetic nitrogen fertilizers.",
+            ],
+            "radar_scores": {
+                "soil_health": 42,
+                "pest_control": 38,
+                "water_efficiency": 45,
+                "economic_resilience": 50,
+                "erosion_control": 35,
+                "labor_ease": 75,
+            },
+        },
+        {
+            "strategy_id": "coffee_agroecological",
+            "is_baseline": False,
+            "name_es": "Estrategia 1: Agroecológica & Fijación de Nitrógeno",
+            "name_en": "Strategy 1: Agroecological & Nitrogen Fixation",
+            "icon": "🌿",
+            "tag_es": "Regeneración de Suelo & Biocontrol",
+            "tag_en": "Soil Regeneration & Biocontrol",
+            "primary_goal": "soil_health",
+            "schedule": [
+                {"period_es": "Año 1 (Entrada de lluvias)", "period_en": "Year 1 (Early rains)", "practice_es": "Poda de cafetos + Siembra de Canavalia en calles", "practice_en": "Coffee pruning + Inter-row Jack Bean seeding", "role_es": "Fijación biológica intensiva de nitrógeno y control de malezas agresivas", "role_en": "Intensive biological N fixation and aggressive weed suppression"},
+                {"period_es": "Año 1 (Canícula / Veranillo)", "period_en": "Year 1 (Midsummer drought)", "practice_es": "Corte de Canavalia y distribución como mulch", "practice_en": "Canavalia cutting and mulch distribution", "role_es": "Protección de humedad radicular monitoreada por SMAP y reducción térmica", "role_en": "Root-zone moisture protection monitored by SMAP and thermal buffering"},
+                {"period_es": "Año 2 (Entrelluvias)", "period_en": "Year 2 (Mid rains)", "practice_es": "Siembra de Crotalaria juncea biofumigante", "practice_en": "Biofumigant Sunn Hemp seeding", "role_es": "Corte de nemátodos agalladores (Meloidogyne) que atacan raíces de café", "role_en": "Disruption of root-knot nematodes attacking coffee rootlets"},
+                {"period_es": "Año 3-4", "period_en": "Year 3-4", "practice_es": "Cosecha plena de café con suelo biológicamente enriquecido", "practice_en": "Full coffee harvest on biologically enriched soils", "role_es": "Máximo vigor vegetativo con reducción del 35% en fertilización química", "role_en": "Peak vegetative vigor with 35% reduction in synthetic fertilizer needs"},
+            ],
+            "partners": ["beans_legumes", "green_manure"],
+            "why_suggested_es": "En zonas de ladera andisólica cafetalera (Tarrazú, Turrialba, Naranjo), las lluvias intensas de septiembre-noviembre lavan nutrientes solubles. La leguminosa aporta nitrógeno orgánico fijado por Rhizobium que no se lixivia con facilidad.",
+            "why_suggested_en": "On steep Andisol coffee slopes (Tarrazú, Turrialba, Naranjo), torrential Sep-Nov rains leach soluble nutrients. Legumes provide organic nitrogen fixed via Rhizobium that resists rapid leaching.",
+            "evidence_supporting_es": "Las anomalías de humedad del suelo de SMAP L4 demuestran que el mulch de leguminosas retiene hasta 22% más agua utilizable durante la sequía. ECOSTRESS indica un índice ESI más bajo (menor estrés evaporativo).",
+            "evidence_supporting_en": "SMAP L4 root-zone moisture anomalies reveal legume mulch retains up to 22% more plant-available water during dry spells. ECOSTRESS indicates a lower ESI (reduced evaporative stress).",
+            "benefits_es": [
+                "Ahorro de hasta $320/ha anuales en fertilizantes químicos nitrogenados.",
+                "Reducción del 60% en la población de nemátodos perjudiciales en raíces jóvenes.",
+                "Disminución drástica de la escorrentía superficial y retención de sedimentos.",
+            ],
+            "benefits_en": [
+                "Savings of up to $320/ha annually in synthetic nitrogen fertilizer costs.",
+                "60% reduction in detrimental nematode counts in young coffee feeder roots.",
+                "Dramatic decrease in surface runoff and effective topsoil retention.",
+            ],
+            "information_gaps_es": "Variabilidad microclimática en valles estrechos donde la nubosidad satelital oculta la reflectancia óptica periódicamente.",
+            "information_gaps_en": "Microclimatic variability in narrow mountain valleys where persistent cloud cover hinders optical sensors.",
+            "risks_and_farmer_review_es": [
+                "Requiere chapea oportuna de la leguminosa antes de que florezca para maximizar la fijación de N.",
+                "Monitorear que Canavalia no trepe por las ramas bajas del cafeto durante la época de fructificación.",
+            ],
+            "risks_and_farmer_review_en": [
+                "Requires timely mowing/slashing of legumes prior to flowering to maximize N fixation.",
+                "Monitor Canavalia vines to ensure they do not climb into coffee fruiting branches.",
+            ],
+            "radar_scores": {
+                "soil_health": 95,
+                "pest_control": 88,
+                "water_efficiency": 84,
+                "economic_resilience": 78,
+                "erosion_control": 92,
+                "labor_ease": 60,
+            },
+        },
+        {
+            "strategy_id": "coffee_market_diversified",
+            "is_baseline": False,
+            "name_es": "Estrategia 2: Diversificación Productiva & Seguridad Alimentaria",
+            "name_en": "Strategy 2: Productive Diversification & Food Security",
+            "icon": "🌽",
+            "tag_es": "Ingresos Suplementarios & Alimento",
+            "tag_en": "Supplemental Income & Food Security",
+            "primary_goal": "income",
+            "schedule": [
+                {"period_es": "Año 1 (Mayo-Agosto)", "period_en": "Year 1 (May-Aug)", "practice_es": "Siembra de Frijol común de ciclo corto (65 días) en calles amplias", "practice_en": "Short-cycle common bean (65 days) intercropped in wide alleys", "role_es": "Cosecha de grano para autoconsumo familiar o venta directa en feria", "role_en": "Grain harvest for farm household food security or local farmers market sales"},
+                {"period_es": "Año 1 (Setiembre-Nov)", "period_en": "Year 1 (Sep-Nov)", "practice_es": "Siembra de Maíz criollo de porte medio", "practice_en": "Medium-stature native maize planting", "role_es": "Ingreso extra por elote tierno y aporte de rastrojo alto en carbono", "role_en": "Extra revenue from sweet corn and high-carbon crop residue generation"},
+                {"period_es": "Año 2+", "period_en": "Year 2+", "practice_es": "Rotación escalonada según ventanas climáticas de IMN", "practice_en": "Staggered rotation tuned to IMN seasonal forecasts", "role_es": "Flujo de caja continuo antes de la maduración del café", "role_en": "Steady cash flow prior to the main coffee harvest season"},
+            ],
+            "partners": ["beans_legumes", "maize_cereal"],
+            "why_suggested_es": "Los caficultores pequeños enfrentan meses de 'vacas flacas' entre mayo y octubre sin ingresos del café. Intercalar cultivos anuales comestibles en calles recién podadas genera flujo de caja inmediato.",
+            "why_suggested_en": "Smallholder coffee farmers face lean months from May to October with zero coffee revenue. Intercropping edible annuals in pruned alleys creates immediate food and cash flow.",
+            "evidence_supporting_es": "GPM registra precipitaciones favorables (>150 mm/mes) entre mayo y agosto en la vertiente Pacífica, ideales para el llenado de grano de frijol sin necesidad de riego suplementario.",
+            "evidence_supporting_en": "GPM records favorable rainfall (>150 mm/month) between May and August on the Pacific slope, optimal for bean pod filling without supplementary irrigation.",
+            "benefits_es": [
+                "Generación de 400-800 kg/ha de frijol para alimentación familiar o venta ($600-1100 extra).",
+                "Diversificación del riesgo ante caídas súbitas en las cotizaciones internacionales del grano de café.",
+                "Uso eficiente de la radiación solar en cafetales en proceso de renovación o poda sistemática.",
+            ],
+            "benefits_en": [
+                "Yields 400-800 kg/ha of beans for household diet or local market sales ($600-1100 extra income).",
+                "Risk diversification against international coffee market price volatility.",
+                "Efficient utilization of solar radiation in renovating or pruned coffee plots.",
+            ],
+            "information_gaps_es": "Acceso a semilla certificada adaptada a sombra parcial en cantones remotos.",
+            "information_gaps_en": "Access to certified shade-tolerant seed varieties in remote cantons.",
+            "risks_and_farmer_review_es": [
+                "Demanda mayor mano de obra familiar durante la siembra y aporque del maíz.",
+                "Evitar densidades excesivas que compitan por luz con los cafetos jóvenes.",
+            ],
+            "risks_and_farmer_review_en": [
+                "Requires additional family labor during planting and hilling of maize.",
+                "Avoid excessive planting density that competes for sunlight with young coffee bushes.",
+            ],
+            "radar_scores": {
+                "soil_health": 80,
+                "pest_control": 74,
+                "water_efficiency": 76,
+                "economic_resilience": 95,
+                "erosion_control": 79,
+                "labor_ease": 58,
+            },
+        },
+        {
+            "strategy_id": "coffee_climate_water",
+            "is_baseline": False,
+            "name_es": "Estrategia 3: Resiliencia Climática & Cobertura Antierosión",
+            "name_en": "Strategy 3: Climate Resilience & Anti-Erosion Cover",
+            "icon": "🥜",
+            "tag_es": "Retención Hídrica & Laderas Seguras",
+            "tag_en": "Water Retention & Slope Protection",
+            "primary_goal": "erosion_control",
+            "schedule": [
+                {"period_es": "Establecimiento", "period_en": "Establishment", "practice_es": "Siembra en calles de Maní Forrajero perenne (Arachis pintoi)", "practice_en": "Inter-row planting of perennial Forage Peanut (Arachis pintoi)", "role_es": "Manto vivo permanente que no compite con las raíces profundas del café", "role_en": "Permanent living mat that does not compete with deeper coffee taproots"},
+                {"period_es": "Bordes & Curvas de nivel", "period_en": "Borders & Contours", "practice_es": "Barreras vivas de Zacate Vetiver en curvas a nivel SRTM", "practice_en": "Living Vetiver barriers planted along SRTM contour lines", "role_es": "Frenado de la escorrentía torrencial y fijación mecánica del terreno", "role_en": "Torrents energy dissipation and mechanical soil anchorage"},
+                {"period_es": "Manejo continuo", "period_en": "Continuous management", "practice_es": "Chapea mecánica ligera 2 veces al año dejando el residuo in-situ", "practice_en": "Light mechanical mowing twice a year leaving cuttings in-situ", "role_es": "Mantenimiento constante de la capa de humus protectora", "role_en": "Continuous replenishment of the protective humus layer"},
+            ],
+            "partners": ["forage_peanut", "vetiver_brachiaria"],
+            "why_suggested_es": "Los modelos de elevación SRTM muestran laderas con pendientes del 20% al 45% en zonas productoras de altura. El maní forrajero forma un colchón vegetal que ancla el suelo frente a tormentas tropicales.",
+            "why_suggested_en": "SRTM elevation models indicate steep slopes from 20% to 45% in high-altitude zones. Forage peanut establishes a dense botanical blanket that anchors soil against tropical storms.",
+            "evidence_supporting_es": "El factor topográfico LS de SRTM y la erosividad R de GPM indican riesgo severo de pérdida de más de 40 t/ha/año de suelo sin cobertura viva permanente.",
+            "evidence_supporting_en": "SRTM topographic LS factor and GPM rainfall erosivity R calculate severe risk exceeding 40 t/ha/year of soil loss without permanent living cover.",
+            "benefits_es": [
+                "Reducción superior al 85% en pérdida de suelo por erosión laminar.",
+                "Descenso de 3 a 5°C en la temperatura superficial del suelo medida por ECOSTRESS.",
+                "Fijación continua de nitrógeno sin necesidad de resembrar cada año.",
+            ],
+            "benefits_en": [
+                "Greater than 85% reduction in topsoil loss from sheet erosion.",
+                "3 to 5°C reduction in land surface temperature as measured by ECOSTRESS thermal infrared.",
+                "Continuous biological N fixation without needing annual reseeding.",
+            ],
+            "information_gaps_es": "Tasa de absorción de agua en horizontes arcillosos subyacentes durante temporales prolongados.",
+            "information_gaps_en": "Water infiltration dynamics in underlying heavy clay horizons during multi-day tropical depressions.",
+            "risks_and_farmer_review_es": [
+                "Costo inicial de adquisición de estolones de maní forrajero en el año de establecimiento.",
+                "Control en las bases de los troncos para facilitar la recolección de granos caídos.",
+            ],
+            "risks_and_farmer_review_en": [
+                "Initial purchase and establishment cost of forage peanut vegetative sprigs.",
+                "Clearing around tree collars to facilitate picking of dropped coffee cherries.",
+            ],
+            "radar_scores": {
+                "soil_health": 91,
+                "pest_control": 82,
+                "water_efficiency": 94,
+                "economic_resilience": 80,
+                "erosion_control": 98,
+                "labor_ease": 70,
+            },
+        },
+    ],
+
+    "Banana": [
+        {
+            "strategy_id": "banana_baseline",
+            "is_baseline": True,
+            "name_es": "Estrategia 0: Monocultivo Tradicional (Línea Base)",
+            "name_en": "Strategy 0: Traditional Monoculture (Baseline)",
+            "icon": "🍌",
+            "tag_es": "Práctica Existente / Monocultivo Continuo",
+            "tag_en": "Existing Practice / Continuous Monoculture",
+            "primary_goal": "income",
+            "schedule": [
+                {"period_es": "Año 1-15+", "period_en": "Year 1-15+", "practice_es": "Banano intensivo en monocultivo permanente", "practice_en": "Intensive permanent monoculture banana", "role_es": "Alta extracción de nutrientes, compactación por cuadrillas y fumigación aérea constante", "role_en": "High nutrient export, foot-traffic compaction, and continuous aerial fungicide spraying"}
+            ],
+            "partners": [],
+            "why_suggested_es": "Es el estándar agroindustrial predominante en el Caribe (Limón, Guácimo, Matina) y Pacífico Sur (Golfito).",
+            "why_suggested_en": "The predominant agroindustrial standard across the Caribbean (Limón, Guácimo, Matina) and South Pacific.",
+            "evidence_supporting_es": "Genera altos volúmenes de exportación, pero SMAP y ECOSTRESS detectan degradación estructural del suelo y alta dependencia de drenajes artificiales continuos.",
+            "evidence_supporting_en": "Generates major export volume, but SMAP and ECOSTRESS reveal structural soil fatigue and total dependence on artificial ditch networks.",
+            "benefits_es": [
+                "Canales de comercialización y empaque ya establecidos con compañías transnacionales.",
+                "Ingresos semanales continuos durante todo el año.",
+            ],
+            "benefits_en": [
+                "Fully established commercialization packinghouse chains with international fruit companies.",
+                "Continuous weekly cash flow throughout the year.",
+            ],
+            "information_gaps_es": "Falta de cuantificación satelital de la acumulación de nematicidas y fungicidas en acuíferos someros.",
+            "information_gaps_en": "Lack of remote sensing resolution regarding nematicide and fungicide leaching into shallow aquifers.",
+            "risks_and_farmer_review_es": [
+                "Proliferación descontrolada de nemátodo barrenador (Radopholus similis).",
+                "Compactación severa del suelo aluvial por tránsito constante de cables vía y operarios.",
+                "Pérdida acelerada de fertilidad natural y declive del microbioma benéfico.",
+            ],
+            "risks_and_farmer_review_en": [
+                "Unchecked proliferation of burrowing nematode (Radopholus similis).",
+                "Severe compaction of alluvial soils from cableway traffic and harvest workers.",
+                "Rapid loss of natural fertility and beneficial soil microbiome decline.",
+            ],
+            "radar_scores": {
+                "soil_health": 35,
+                "pest_control": 32,
+                "water_efficiency": 40,
+                "economic_resilience": 60,
+                "erosion_control": 45,
+                "labor_ease": 70,
+            },
+        },
+        {
+            "strategy_id": "banana_biofumigation",
+            "is_baseline": False,
+            "name_es": "Estrategia 1: Biofumigación Post-Ciclo & Barbecho Mejorado",
+            "name_en": "Strategy 1: Post-Cycle Biofumigation & Improved Fallow",
+            "icon": "🌿",
+            "tag_es": "Saneamiento de Nemátodos & Fusarium",
+            "tag_en": "Nematode Sanitization & Fusarium Control",
+            "primary_goal": "pest_control",
+            "schedule": [
+                {"period_es": "Mes 1-3", "period_en": "Month 1-3", "practice_es": "Trituración de cepas viejas + Siembra densa de Crotalaria juncea", "practice_en": "Old pseudostem shredding + Dense Crotalaria juncea seeding", "role_es": "Biofumigación radical que colapsa poblaciones de Radopholus similis", "role_en": "Radical biofumigation collapsing Radopholus similis nematode loads"},
+                {"period_es": "Mes 4-6", "period_en": "Month 4-6", "practice_es": "Incorporación de biomasa + Siembra de Mucuna pruriens", "practice_en": "Biomass incorporation + Velvet Bean (Mucuna) planting", "role_es": "Inyección masiva de nitrógeno orgánico y supresión de malezas", "role_en": "Massive injection of organic N and total smothering of weeds"},
+                {"period_es": "Mes 7+", "period_en": "Month 7+", "practice_es": "Resiembra de cormos saneados de banano", "practice_en": "Replanting with certified tissue-culture banana corms", "role_es": "Arranque vegetativo explosivo en suelo limpio y desinfectado biológicamente", "role_en": "Explosive vegetative start in biologically cleansed and enriched soil"},
+            ],
+            "partners": ["green_manure", "beans_legumes"],
+            "why_suggested_es": "El banano continuo sufre fatiga biológica por acumulación de nemátodos y patógenos en el rizoma. Una rotación de 6 meses con Crotalaria y Mucuna 'resetea' la microbiota patógena sin aplicar químicos tóxicos.",
+            "why_suggested_en": "Continuous banana suffers biological exhaustion due to nematode and rhizome pathogen build-up. A 6-month rotation with Crotalaria and Mucuna resets the microbiome without toxic nematicides.",
+            "evidence_supporting_es": "Investigaciones de CORBANA y la UCR demuestran reducciones de hasta 80% en Radopholus similis. SMAP confirma un aumento notable en la capacidad de retención de humedad por adición de humus.",
+            "evidence_supporting_en": "CORBANA and University of Costa Rica trials prove up to 80% suppression of Radopholus similis. SMAP confirms substantial improvements in water retention capacity from added humus.",
+            "benefits_es": [
+                "Ahorro de hasta $450/ha en nematicidas y desinfectantes químicos de suelo.",
+                "Aporte de más de 8 t/ha de materia seca que reactiva lombrices y bacterias benéficas.",
+                "Mayor anclaje radicular, reduciendo el volcamiento de plantas con racimos pesados.",
+            ],
+            "benefits_en": [
+                "Savings up to $450/ha in chemical nematicides and synthetic soil fumigants.",
+                "Over 8 t/ha of dry matter input reviving earthworms and beneficial bacteria.",
+                "Dramatically stronger root anchorage, preventing wind toppling of heavy bunches.",
+            ],
+            "information_gaps_es": "Disponibilidad de maquinaria adecuada para triturar cepas de banano en fincas pequeñas.",
+            "information_gaps_en": "Availability of appropriate tractor shredders for pseudostems on smallholder plots.",
+            "risks_and_farmer_review_es": [
+                "El productor debe disponer de un plan financiero para los 6 meses de pausa productiva del lote rotado.",
+                "Asegurar drenajes profundos para evitar anegamiento de la Crotalaria en meses lluviosos.",
+            ],
+            "risks_and_farmer_review_en": [
+                "Farmer must plan cash flow during the 6-month productive pause on the rotated parcel.",
+                "Ensure proper field drainage ditches to prevent waterlogging of Crotalaria in wet months.",
+            ],
+            "radar_scores": {
+                "soil_health": 94,
+                "pest_control": 96,
+                "water_efficiency": 82,
+                "economic_resilience": 75,
+                "erosion_control": 85,
+                "labor_ease": 62,
+            },
+        },
+        {
+            "strategy_id": "banana_cereal_forage",
+            "is_baseline": False,
+            "name_es": "Estrategia 2: Rotación Comercial Maíz/Sorgo & Ganadería Menor",
+            "name_en": "Strategy 2: Commercial Maize/Sorghum Rotation & Small Livestock",
+            "icon": "🌽",
+            "tag_es": "Rastrojo Voluminoso & Alimentación Animal",
+            "tag_en": "Heavy Residue & Livestock Feed",
+            "primary_goal": "income",
+            "schedule": [
+                {"period_es": "Fase 1 (4 meses)", "period_en": "Phase 1 (4 months)", "practice_es": "Rotación con Maíz o Sorgo Forrajero de alto porte", "practice_en": "Rotation with high-biomass Maize or Forage Sorghum", "role_es": "Corte para ensilaje animal de alta energía o cosecha de grano", "role_en": "Harvest for high-energy silage or grain cash crop"},
+                {"period_es": "Fase 2 (2 meses)", "practice_es": "Incorporación de rastrojo fibroso con rastra ligera", "practice_en": "Fibrous residue incorporation with light disk harrow", "period_en": "Phase 2 (2 months)", "role_es": "Descompactación de huellas de maquinaria y aireación del suelo aluvial", "role_en": "Alleviation of equipment compaction tracks and alluvial soil aeration"},
+                {"period_es": "Fase 3", "practice_es": "Nueva siembra de banano con espaciamiento mejorado", "practice_en": "New banana planting with optimized spatial geometry", "period_en": "Phase 3", "role_es": "Retorno a la producción de fruta con suelo aireado y descompactado", "role_en": "Return to fruit production on well-aerated, decompressed soil"},
+            ],
+            "partners": ["maize_cereal", "cassava_roots"],
+            "why_suggested_es": "El maíz y el sorgo son gramíneas C4 de altísima eficiencia fotosintética que no comparten plagas con el banano y generan alimento vital para animales locales.",
+            "why_suggested_en": "Maize and sorghum are C4 grasses with outstanding photosynthetic efficiency that share no pests with banana while supplying vital local feed.",
+            "evidence_supporting_es": "GPM registra excelente balance hídrico en las llanuras de Sarapiquí y San Carlos, sustentando ciclos rápidos de cereales de 90 a 110 días.",
+            "evidence_supporting_en": "GPM data confirms an exceptional water balance in Sarapiquí and San Carlos plains, sustaining rapid 90-110 day cereal cycles.",
+            "benefits_es": [
+                "Producción de 20 a 35 toneladas/ha de forraje verde para ganadería bovina o caprina.",
+                "Estructuración de macroporos en suelos Inceptisoles pesados gracias al sistema radicular fasciculado.",
+                "Corte absoluto de la transmisión de la bacteria Ralstonia solanacearum (Moko del banano).",
+            ],
+            "benefits_en": [
+                "Yields 20 to 35 tons/ha of high-quality green forage for dairy cattle or goats.",
+                "Boosts macropore development in heavy Inceptisols via fibrous root systems.",
+                "Absolute interruption of Ralstonia solanacearum (Banana Moko disease) bacterial persistence.",
+            ],
+            "information_gaps_es": "Costos de picado y transporte de forraje en áreas con caminos secundarios de lastre.",
+            "information_gaps_en": "Machinery chopping and transport economics on gravel secondary rural roads.",
+            "risks_and_farmer_review_es": [
+                "Control de aves plaga durante la fase de llenado de espiga del maíz/sorgo.",
+            ],
+            "risks_and_farmer_review_en": [
+                "Bird control during the milk-grain filling stage of sorghum or maize.",
+            ],
+            "radar_scores": {
+                "soil_health": 82,
+                "pest_control": 88,
+                "water_efficiency": 78,
+                "economic_resilience": 92,
+                "erosion_control": 80,
+                "labor_ease": 68,
+            },
+        },
+        {
+            "strategy_id": "banana_water_buffer",
+            "is_baseline": False,
+            "name_es": "Estrategia 3: Resiliencia Hídrica & Cobertura Antierosiva Aluvial",
+            "name_en": "Strategy 3: Water Buffering & Alluvial Living Armor",
+            "icon": "🥜",
+            "tag_es": "Protección contra Inundaciones & Anegamiento",
+            "tag_en": "Flood Protection & Soil Armor",
+            "primary_goal": "water_conservation",
+            "schedule": [
+                {"period_es": "Permanente", "period_en": "Permanent", "practice_es": "Maní forrajero rastrero establecido en canales y calles de drenaje", "practice_en": "Trailing Forage Peanut established on ditch banks and pathways", "role_es": "Estabilización de bordes de canales de drenaje frente al oleaje de escorrentía", "role_en": "Stabilizing drainage ditch banks against scouring and slumping"},
+                {"period_es": "Inter-ciclo", "period_en": "Inter-cycle", "practice_es": "Pastos de corte de raíz profunda (Brachiaria humidicola)", "practice_en": "Deep-rooting tropical grass fallow (Brachiaria humidicola)", "role_es": "Lavado biológico de sales y descompactación profunda", "role_en": "Biological leaching of residual salts and subsoil loosening"},
+            ],
+            "partners": ["forage_peanut", "vetiver_brachiaria"],
+            "why_suggested_es": "Las lluvias torrenciales medidas por GPM en el Caribe costarricense erosionan los taludes de los canales de drenaje bananeros, causando aterramiento y anegamiento de raíces.",
+            "why_suggested_en": "GPM-monitored torrential downpours on Costa Rica's Caribbean coast erode drainage ditch shoulders, silting canals and suffocating banana roots.",
+            "evidence_supporting_es": "SMAP L2/L4 confirma episodios de saturación hídrica extrema (>0.42 m3/m3). La cobertura viva estabiliza la tasa de infiltración medida por IMN.",
+            "evidence_supporting_en": "SMAP L2/L4 confirms extreme soil saturation events (>0.42 m3/m3). Living cover stabilizes infiltration rates mapped by IMN.",
+            "benefits_es": [
+                "Ahorro de hasta $600/km en mantenimiento y limpieza mecánica de canales primarios y secundarios.",
+                "Evita el desmoronamiento de bordes de drenaje y mejora la velocidad de evacuación de agua.",
+                "Reduce la evaporación del suelo en veranillos cortos, manteniendo turgencia foliar.",
+            ],
+            "benefits_en": [
+                "Savings up to $600/km in heavy excavator ditch maintenance and desilting.",
+                "Prevents bank collapse and accelerates gravity flood drainage.",
+                "Reduces direct surface evaporation during dry periods, maintaining leaf turgidity.",
+            ],
+            "information_gaps_es": "Resistencia de diferentes ecotipos de maní forrajero a inmersión temporal en agua.",
+            "information_gaps_en": "Tolerance of specific forage peanut ecotypes to multi-day water immersion.",
+            "risks_and_farmer_review_es": [
+                "Mantener el maní confinado a las calles para que no invada la zona de deshoje del banano.",
+            ],
+            "risks_and_farmer_review_en": [
+                "Keep peanut mulch trimmed away from pseudostem bases to prevent leaf-stripping interference.",
+            ],
+            "radar_scores": {
+                "soil_health": 88,
+                "pest_control": 80,
+                "water_efficiency": 96,
+                "economic_resilience": 82,
+                "erosion_control": 95,
+                "labor_ease": 72,
+            },
+        },
+    ],
+
+    "Sugar Cane": [
+        {
+            "strategy_id": "cane_baseline",
+            "is_baseline": True,
+            "name_es": "Estrategia 0: Monocultivo Tradicional (Línea Base)",
+            "name_en": "Strategy 0: Traditional Monoculture (Baseline)",
+            "icon": "🌾",
+            "tag_es": "Práctica Existente / Monocultivo Continuo",
+            "tag_en": "Existing Practice / Continuous Monoculture",
+            "primary_goal": "income",
+            "schedule": [
+                {"period_es": "Año 1-5", "period_en": "Year 1-5", "practice_es": "Plantilla inicial seguida de 4 a 6 socas consecutivas con quema", "practice_en": "Plant cane followed by 4 to 6 consecutive burned ratoons", "role_es": "Cosecha intensiva con quema previa y desprotección total del suelo post-zafra", "role_en": "Intensive harvest with pre-burn and complete soil bare exposure post-harvest"}
+            ],
+            "partners": [],
+            "why_suggested_es": "Práctica clásica en Guanacaste (Liberia, Cañas, Carrillo) y Puntarenas central. Maximiza toneladas de caña entregadas al ingenio a corto plazo.",
+            "why_suggested_en": "Classic practice in Guanacaste (Liberia, Cañas, Carrillo) and central Puntarenas. Maximizes cane tonnage delivered to sugar mills.",
+            "evidence_supporting_es": "SMAP y ECOSTRESS evidencian que los suelos quedan totalmente desnudos (bare soil) durante los meses más calurosos (Feb-Abril), perdiendo agua y quemando materia orgánica.",
+            "evidence_supporting_en": "SMAP and ECOSTRESS confirm soils remain completely bare during the hottest months (Feb-Apr), accelerating moisture loss and oxidizing organic matter.",
+            "benefits_es": [
+                "Facilita el corte manual y el transporte rápido en carretas.",
+                "No requiere coordinar siembras secundarias en la ventana seca.",
+            ],
+            "benefits_en": [
+                "Simplifies manual cane cutting and rapid trailer transport.",
+                "Requires zero secondary crop coordination during the dry season.",
+            ],
+            "information_gaps_es": "Monitoreo de la tasa de destrucción de materia orgánica por quema repetida en Vertisoles.",
+            "information_gaps_en": "Monitoring the exact destruction rate of organic matter from repeated burns on Vertisols.",
+            "risks_and_farmer_review_es": [
+                "Degradación rápida de socas a partir del 3er año, disminuyendo el rendimiento de 90 t/ha a 55 t/ha.",
+                "Compactación extrema por cosechadoras y camiones en suelos secos o húmedos.",
+                "Severa erosión eólica durante los vientos alisios de Guanacaste.",
+            ],
+            "risks_and_farmer_review_en": [
+                "Rapid ratoon yield collapse after year 3, dropping from 90 t/ha to 55 t/ha.",
+                "Extreme compaction from heavy harvesters and haulage trailers.",
+                "Severe wind erosion during strong Guanacaste trade wind periods.",
+            ],
+            "radar_scores": {
+                "soil_health": 32,
+                "pest_control": 36,
+                "water_efficiency": 35,
+                "economic_resilience": 55,
+                "erosion_control": 30,
+                "labor_ease": 75,
+            },
+        },
+        {
+            "strategy_id": "cane_inter_ratoon_legume",
+            "is_baseline": False,
+            "name_es": "Estrategia 1: Renovación Entre Socas con Leguminosas de Ciclo Corto",
+            "name_en": "Strategy 1: Inter-Ratoon Legume Renovation",
+            "icon": "🫘",
+            "tag_es": "Fijación de N & Corte de Fatiga",
+            "tag_en": "N Fixation & Soil Rest",
+            "primary_goal": "soil_health",
+            "schedule": [
+                {"period_es": "Entrezafra (Mes 1-3)", "period_en": "Post-harvest window (Mo 1-3)", "practice_es": "Siembra inmediata de Frijol Caupí o Soya de 75-90 días", "practice_en": "Immediate seeding of Cowpea or short-cycle 75-90d Soy", "role_es": "Aprovechamiento de primeras lluvias para fijar 60-80 kg N/ha", "role_en": "Utilizing early rains to biologically fix 60-80 kg N/ha"},
+                {"period_es": "Pre-siembra (Mes 4)", "period_en": "Pre-planting (Mo 4)", "practice_es": "Incorporación de la biomasa con subsolador ecológico", "practice_en": "Biomass incorporation with ecological subsoiler", "role_es": "Descompactación profunda y suministro de nitrógeno asimilable", "role_en": "Deep subsoiling and plant-available N release"},
+                {"period_es": "Ciclo Caña (Año 1-4)", "period_en": "Cane Cycle (Yr 1-4)", "practice_es": "Nueva plantilla de caña con vigor radicular repotenciado", "practice_en": "New plant cane with supercharged root vigor", "role_es": "Incremento de rendimiento promedio de +18 a +25 t/ha", "role_en": "Average yield boost of +18 to +25 tons/ha"},
+            ],
+            "partners": ["beans_legumes", "cowpea_pigeonpea"],
+            "why_suggested_es": "Los suelos cañeros de Guanacaste sufren 'fatiga de suelo' tras 4 o 5 cortes. El frijol caupí tolera altas temperaturas y fija nitrógeno rápidamente antes de que se instale la nueva caña.",
+            "why_suggested_en": "Guanacaste sugar soils suffer 'soil sickness' after 4-5 ratoons. Cowpea thrives in high temperatures and fixes nitrogen rapidly before new cane is planted.",
+            "evidence_supporting_es": "LAICA (Liga Agrícola Industrial de la Caña) ha comprobado que el caupí entrezafra aporta hasta un 40% del nitrógeno que necesitará la plantilla, respaldado por la curva de lluvias de GPM.",
+            "evidence_supporting_en": "LAICA field trials prove inter-season cowpea supplies up to 40% of the nitrogen required by the new plant cane, well matched with GPM rainfall onset.",
+            "benefits_es": [
+                "Ahorro de $280/ha en fertilización con urea o nitrato de amonio.",
+                "Ruptura efectiva del ciclo biológico del taladrador del tallo (Diatraea saccharalis).",
+                "Aumento medible en la concentración de sacarosa (grados Brix / rendimiento industrial).",
+            ],
+            "benefits_en": [
+                "Savings of $280/ha on synthetic urea or ammonium nitrate applications.",
+                "Effective disruption of the sugarcane stem borer (Diatraea saccharalis) lifecycle.",
+                "Measurable boost in sucrose content (Brix degrees / factory recovery sugar).",
+            ],
+            "information_gaps_es": "Disponibilidad de sembradoras mecánicas de siembra directa en pequeñas cooperativas.",
+            "information_gaps_en": "Availability of no-till mechanical seeders within small sugar farmer cooperatives.",
+            "risks_and_farmer_review_es": [
+                "Ventana ajustada entre el final de la molienda del ingenio y las primeras lluvias.",
+            ],
+            "risks_and_farmer_review_en": [
+                "Tight operational window between sugar mill shut-down and the onset of monsoons.",
+            ],
+            "radar_scores": {
+                "soil_health": 95,
+                "pest_control": 88,
+                "water_efficiency": 84,
+                "economic_resilience": 88,
+                "erosion_control": 82,
+                "labor_ease": 66,
+            },
+        },
+        {
+            "strategy_id": "cane_tuber_diversification",
+            "is_baseline": False,
+            "name_es": "Estrategia 2: Rotación Comercial con Yuca / Camote de Exportación",
+            "name_en": "Strategy 2: Commercial Cassava / Sweet Potato Export Rotation",
+            "icon": "🍠",
+            "tag_es": "Monetización del Barbecho & Descompactación",
+            "tag_en": "Fallow Monetization & Decompaction",
+            "primary_goal": "income",
+            "schedule": [
+                {"period_es": "Año 1", "period_en": "Year 1", "practice_es": "Destrucción de cepas viejas + Siembra de Yuca Valencia", "practice_en": "Old cane destruction + Export-grade Cassava planting", "role_es": "Cosecha de 18-25 t/ha de raíces comerciales y rotura de suelo", "role_en": "Harvesting 18-25 t/ha of export roots and breaking plow pans"},
+                {"period_es": "Año 2-5", "period_en": "Year 2-5", "practice_es": "Siembra de Caña de Azúcar en suelo restaurado", "practice_en": "Sugar Cane establishment on structurally restored soils", "role_es": "Cañaveral limpio de malezas gramíneas resistentes", "role_en": "Cane stand free from resistant noxious grass weeds"},
+            ],
+            "partners": ["cassava_roots", "maize_cereal"],
+            "why_suggested_es": "Rotar un ciclo completo de caña con un cultivo de raíz como la yuca genera ingresos extraordinarios y rompe completamente el banco de semillas de malezas gramíneas (caminadora, zacate Johnson).",
+            "why_suggested_en": "Rotating a cane cycle with a root crop like cassava produces attractive cash returns and completely breaks resistant grass weed seedbanks.",
+            "evidence_supporting_es": "Los datos de temperatura del suelo de ECOSTRESS y las pendientes planas de SRTM en Guanacaste son idóneos para el engrose de raíces tuberosas.",
+            "evidence_supporting_en": "ECOSTRESS ground temperature and flat SRTM coastal topography in Guanacaste are ideal for rapid tuber bulking.",
+            "benefits_es": [
+                "Ingresos brutos adicionales de $3,500 a $6,000/ha por venta de yuca en el año de rotación.",
+                "Aflojamiento biológico del suelo hasta 45 cm de profundidad sin destruir agregados.",
+                "Reducción radical en el uso de herbicidas hormonales costosos.",
+            ],
+            "benefits_en": [
+                "Additional gross returns of $3,500 to $6,000/ha from cassava exports during rotation year.",
+                "Biological soil loosening down to 45 cm depth preserving aggregate structure.",
+                "Radical reduction in the need for expensive hormone-based post-emergent herbicides.",
+            ],
+            "information_gaps_es": "Cercanía a plantas procesadoras y empacadoras de yuca parafinada en la región.",
+            "information_gaps_en": "Proximity to regional paraffin-waxed cassava packing and export plants.",
+            "risks_and_farmer_review_es": [
+                "Requiere mano de obra especializada para la cosecha manual de raíces sin partirlas.",
+            ],
+            "risks_and_farmer_review_en": [
+                "Requires careful manual labor during harvest to avoid root bruising and breakage.",
+            ],
+            "radar_scores": {
+                "soil_health": 85,
+                "pest_control": 92,
+                "water_efficiency": 80,
+                "economic_resilience": 96,
+                "erosion_control": 75,
+                "labor_ease": 60,
+            },
+        },
+        {
+            "strategy_id": "cane_drought_mulch",
+            "is_baseline": False,
+            "name_es": "Estrategia 3: Resiliencia Climática & Caña Verde sin Quema (Mulch)",
+            "name_en": "Strategy 3: Climate Resilience & Green Harvest (No-Burn Mulch)",
+            "icon": "🌿",
+            "tag_es": "Ahorro de Agua & Crotalaria de Cobertura",
+            "tag_en": "Water Conservation & Sunn Hemp Cover",
+            "primary_goal": "water_conservation",
+            "schedule": [
+                {"period_es": "Post-Cosecha Verde", "period_en": "Post Green Harvest", "practice_es": "Cosecha en verde (sin quema) + acolchado con rastrojo de caña", "practice_en": "Green harvest (no burning) + thick trash blanketing", "role_es": "Cobertura de 8-12 t/ha de rastrojo que reduce evaporación en 45%", "role_en": "8-12 t/ha trash mulch reducing evaporation by 45%"},
+                {"period_es": "Temporada de Lluvias", "period_en": "Rainy Season", "practice_es": "Siembra en hileras alternas de Crotalaria ochroleuca", "practice_en": "Alternate-row intercropping of Crotalaria ochroleuca", "role_es": "Fijación biológica de N e incremento de infiltración de lluvias GPM", "role_en": "Biological N fixation and accelerated GPM rainfall infiltration"},
+            ],
+            "partners": ["green_manure", "forage_peanut"],
+            "why_suggested_es": "El cambio climático proyectado por el IMN anticipa sequías más agudas en el Pacífico Norte (Guanacaste). Cosechar sin quemar y cubrir el suelo retiene la escasa humedad satelital de SMAP.",
+            "why_suggested_en": "IMN climate projections forecast harsher droughts in Guanacaste. No-burn harvesting combined with trash mulching conserves precious SMAP moisture.",
+            "evidence_supporting_es": "ECOSTRESS registra una caída de hasta 7°C en la temperatura de la superficie del suelo bajo colchón de rastrojo comparado con suelos quemados al mediodía.",
+            "evidence_supporting_en": "ECOSTRESS records up to a 7°C drop in mid-day land surface temperature under cane trash blankets compared to bare burnt fields.",
+            "benefits_es": [
+                "Ahorro de 2 a 3 turnos de riego por gravedad o goteo durante la sequía.",
+                "Eliminación total de multas ambientales y quejas vecinales por humo y ceniza.",
+                "Incremento constante del carbono orgánico del suelo (+0.8% en 4 años).",
+            ],
+            "benefits_en": [
+                "Saves 2 to 3 full irrigation rounds during seasonal drought spells.",
+                "Total elimination of environmental fines and public complaints over smoke and ash.",
+                "Steady increase in soil organic carbon (+0.8% over 4 years).",
+            ],
+            "information_gaps_es": "Monitoreo de posibles plagas de suelo (ej. salivazo o Prosapia) atraídas por la humedad del acolchado.",
+            "information_gaps_en": "Tracking potential soil insect pests (e.g. froghopper / Prosapia) favored by moist mulch.",
+            "risks_and_farmer_review_es": [
+                "Adaptar las cosechadoras mecánicas para picar y esparcir el rastrojo uniformemente.",
+            ],
+            "risks_and_farmer_review_en": [
+                "Harvester chopper adjustment to shred and distribute straw evenly across inter-rows.",
+            ],
+            "radar_scores": {
+                "soil_health": 92,
+                "pest_control": 80,
+                "water_efficiency": 97,
+                "economic_resilience": 84,
+                "erosion_control": 94,
+                "labor_ease": 68,
+            },
+        },
+    ],
+
+    "Pineapple": [
+        {
+            "strategy_id": "pineapple_baseline",
+            "is_baseline": True,
+            "name_es": "Estrategia 0: Monocultivo Tradicional (Línea Base)",
+            "name_en": "Strategy 0: Traditional Monoculture (Baseline)",
+            "icon": "🍍",
+            "tag_es": "Práctica Existente / Monocultivo Continuo",
+            "tag_en": "Existing Practice / Continuous Monoculture",
+            "primary_goal": "income",
+            "schedule": [
+                {"period_es": "Año 1-3", "period_en": "Year 1-3", "practice_es": "Cosecha inicial y cosecha inducida continua en monocultivo", "practice_en": "Plant crop and induced ratoon in continuous monoculture", "role_es": "Uso intensivo de herbicidas, desinfección química de suelo y rastreo profundo", "role_en": "Intensive herbicide applications, chemical soil fumigation, and deep tillage"}
+            ],
+            "partners": [],
+            "why_suggested_es": "El modelo convencional exportador en Huetar Norte (San Carlos, Upala, Los Chiles) y Buenos Aires de Puntarenas. Centrado en el volumen masivo de piña fresca MD2.",
+            "why_suggested_en": "Conventional export model in Northern Region (San Carlos, Upala, Los Chiles) and Buenos Aires. Geared towards high-volume fresh MD2 pineapple.",
+            "evidence_supporting_es": "Genera divisas clave, pero SMAP y el IMN registran compactación de horizontes arcillosos (Ultisoles) y problemas severos de lixiviación de agroquímicos hacia humedales.",
+            "evidence_supporting_en": "Generates vital foreign exchange, but SMAP and IMN record compaction in Ultisol clay horizons and severe agrochemical runoff into wetlands.",
+            "benefits_es": [
+                "Máxima rentabilidad por hectárea en mercados internacionales consolidados.",
+                "Infraestructura logística altamente automatizada.",
+            ],
+            "benefits_en": [
+                "Maximum short-term gross returns per hectare in consolidated global fruit markets.",
+                "Highly automated cold-chain logistics infrastructure.",
+            ],
+            "information_gaps_es": "Mapeo satelital de micro-residuos de bromacil y diurón en aguas subterráneas locales.",
+            "information_gaps_en": "Satellite detection limits regarding persistent bromacil/diuron residues in local groundwater.",
+            "risks_and_farmer_review_es": [
+                "Explosión de sinfilidos (Scutigerella immaculata) y pudriciones de raíz (Phytophthora nicotianae).",
+                "Erosión masiva durante las tormentas tropicales de la Zona Norte.",
+                "Degradación de la acidez del suelo y bloqueo de nutrientes esenciales.",
+            ],
+            "risks_and_farmer_review_en": [
+                "Symphylid explosions (Scutigerella immaculata) and root rot (Phytophthora nicotianae).",
+                "Massive soil loss during heavy Northern zone tropical downpours.",
+                "Severe soil acidification locking out essential micronutrients.",
+            ],
+            "radar_scores": {
+                "soil_health": 30,
+                "pest_control": 28,
+                "water_efficiency": 38,
+                "economic_resilience": 65,
+                "erosion_control": 32,
+                "labor_ease": 72,
+            },
+        },
+        {
+            "strategy_id": "pineapple_biofumigation_crotalaria",
+            "is_baseline": False,
+            "name_es": "Estrategia 1: Biofumigación Post-Rastrojo & Desintoxicación Biológica",
+            "name_en": "Strategy 1: Post-Stubble Biofumigation & Biological Detox",
+            "icon": "🌿",
+            "tag_es": "Supresión de Sinfilidos & Nemátodos",
+            "tag_en": "Symphylid & Nematode Suppression",
+            "primary_goal": "pest_control",
+            "schedule": [
+                {"period_es": "Mes 1-2", "period_en": "Month 1-2", "practice_es": "Trituración mecánica de rastrojo de piña + cal agrícola para corregir pH", "practice_en": "Mechanical shredding of pineapple stubble + agricultural lime", "role_es": "Aceleración de descomposición bacteriana del rastrojo ácido", "role_en": "Accelerating bacterial decomposition of acidic pineapple residues"},
+                {"period_es": "Mes 3-5", "period_en": "Month 3-5", "practice_es": "Siembra densa de Crotalaria juncea (40 kg semilla/ha)", "practice_en": "Dense seeding of Crotalaria juncea (40 kg seed/ha)", "role_es": "Biofumigación que erradica sinfilidos y nemátodos parásitos", "role_en": "Biofumigation suppressing symphylids and root-knot nematodes"},
+                {"period_es": "Mes 6", "period_en": "Month 6", "practice_es": "Incorporación de biomasa verde al suelo", "practice_en": "Green biomass incorporation into topsoil", "role_es": "Inyección de 12 t/ha de materia orgánica fresca rica en nitrógeno", "role_en": "Injecting 12 t/ha of fresh nitrogen-rich organic matter"},
+                {"period_es": "Mes 7+", "period_en": "Month 7+", "practice_es": "Nueva siembra de hijos de Piña MD2 seleccionados", "practice_en": "New planting with selected clean MD2 pineapple slips", "role_es": "Desarrollo radicular vigoroso sin necesidad de nematicidas químicos", "role_en": "Vigorous root system development free from chemical nematicides"},
+            ],
+            "partners": ["green_manure", "cassava_roots"],
+            "why_suggested_es": "El rastrojo de piña genera una acidez extrema y alberga plagas radiculares devastadoras. La Crotalaria actúa como biofumigante natural que desintoxica el suelo antes de la siguiente siembra.",
+            "why_suggested_en": "Pineapple residue generates extreme acidity and harbors damaging root pests. Crotalaria serves as a natural biofumigant that cleanses soil prior to the next planting.",
+            "evidence_supporting_es": "Estudios agronómicos del INTA en San Carlos demuestran una reducción superior al 75% en el ataque de Scutigerella tras un ciclo de Crotalaria juncea.",
+            "evidence_supporting_en": "INTA field trials in San Carlos confirm greater than 75% reduction in Scutigerella attacks following a single Crotalaria cycle.",
+            "benefits_es": [
+                "Ahorro de hasta $550/ha en insecticidas y nematicidas sintéticos de alto riesgo.",
+                "Desbloqueo de fósforo y micronutrientes fijados por la acidez del suelo.",
+                "Crecimiento 20% más rápido de las raíces en los primeros 90 días de la piña.",
+            ],
+            "benefits_en": [
+                "Savings up to $550/ha on hazardous synthetic soil insecticides and nematicides.",
+                "Unlocking phosphorus and micronutrients bound by high Ultisol acidity.",
+                "20% faster root system establishment during the first 90 days after slip planting.",
+            ],
+            "information_gaps_es": "Tasas de descomposición del rastrojo bajo regímenes de lluvias extremas en Upala.",
+            "information_gaps_en": "Residue decomposition kinetics under extreme cloudburst precipitation in Upala.",
+            "risks_and_farmer_review_es": [
+                "Asegurar una trituración muy fina del rastrojo de piña para evitar focos de mosca del establo (Stomoxys calcitrans).",
+            ],
+            "risks_and_farmer_review_en": [
+                "Ensure fine shredding and soil incorporation to avoid breeding stable flies (Stomoxys calcitrans).",
+            ],
+            "radar_scores": {
+                "soil_health": 96,
+                "pest_control": 97,
+                "water_efficiency": 82,
+                "economic_resilience": 80,
+                "erosion_control": 88,
+                "labor_ease": 60,
+            },
+        },
+        {
+            "strategy_id": "pineapple_cassava_rotation",
+            "is_baseline": False,
+            "name_es": "Estrategia 2: Rotación Comercial con Yuca de Exportación & Leguminosa",
+            "name_en": "Strategy 2: Commercial Cassava Export & Legume Crop Rotation",
+            "icon": "🍠",
+            "tag_es": "Diversificación de Mercado & Descompactación",
+            "tag_en": "Market Diversification & Deep Rooting",
+            "primary_goal": "income",
+            "schedule": [
+                {"period_es": "Año 1", "period_en": "Year 1", "practice_es": "Cosecha final de piña + Siembra de Yuca Valencia", "practice_en": "Final pineapple harvest + Export Cassava planting", "role_es": "Generación de ingresos exportables y rotura natural de suelas de arado", "role_en": "Generating export revenue and naturally breaking plow pans"},
+                {"period_es": "Año 2 (Mes 1-3)", "period_en": "Year 2 (Month 1-3)", "practice_es": "Post-cosecha de yuca + Barbecho corto con Frijol Canavalia", "practice_en": "Post-cassava harvest + Short Jack Bean cover crop", "role_es": "Recuperación de nitrógeno y cobertura del suelo en época lluviosa", "role_en": "Nitrogen recovery and complete soil canopy armor in wet months"},
+                {"period_es": "Año 2-4", "period_en": "Year 2-4", "practice_es": "Nueva siembra de piña con suelo regenerado", "practice_en": "New pineapple crop planted in revitalized soil", "role_es": "Fruta de mayor calibre y menor porcentaje de rechazo en empacadora", "role_en": "Higher fruit sizing and reduced reject rates at packinghouses"},
+            ],
+            "partners": ["cassava_roots", "beans_legumes"],
+            "why_suggested_es": "La Zona Norte de Costa Rica es el epicentro tanto de la piña como de la yuca de exportación. Alternar ambos cultivos permite mantener ingresos de exportación mientras se descansa el lote de piña.",
+            "why_suggested_en": "Northern Costa Rica is the epicenter of both export pineapple and cassava. Alternating them preserves high export revenue while resting the pineapple ground.",
+            "evidence_supporting_es": "Datos de GPM y NASA POWER confirman que la radiación solar y la precipitación en la llanura de San Carlos sostienen rendimientos de yuca superiores a 22 t/ha.",
+            "evidence_supporting_en": "GPM and NASA POWER data indicate solar radiation and rainfall in San Carlos easily sustain cassava yields exceeding 22 t/ha.",
+            "benefits_es": [
+                "Ingresos de $4,000 a $7,000/ha por exportación de yuca en el intervalo entre ciclos de piña.",
+                "Descompactación biológica profunda gracias a las raíces tuberosas de la yuca.",
+                "Reducción sustancial en la fatiga específica del suelo para bromeliáceas.",
+            ],
+            "benefits_en": [
+                "Revenues of $4,000 to $7,000/ha from cassava exports during the inter-pineapple interval.",
+                "Biological decompaction down through dense subsoils via tuberous root expansion.",
+                "Substantial relief from bromeliad-specific soil biological fatigue.",
+            ],
+            "information_gaps_es": "Contratos de compra anticipada con empacadoras locales para garantizar precio de la yuca.",
+            "information_gaps_en": "Advance purchase contract availability with regional packhouses for guaranteed cassava pricing.",
+            "risks_and_farmer_review_es": [
+                "Manejo de rastrojos de yuca para no albergar bacterias vasculares.",
+            ],
+            "risks_and_farmer_review_en": [
+                "Careful sanitation of cassava crop residues to prevent bacterial vascular blight.",
+            ],
+            "radar_scores": {
+                "soil_health": 88,
+                "pest_control": 89,
+                "water_efficiency": 80,
+                "economic_resilience": 96,
+                "erosion_control": 84,
+                "labor_ease": 64,
+            },
+        },
+        {
+            "strategy_id": "pineapple_pasture_structure",
+            "is_baseline": False,
+            "name_es": "Estrategia 3: Resiliencia Climática & Descanso con Pasto Brachiaria",
+            "name_en": "Strategy 3: Climate Resilience & Deep Grass Fallow (Brachiaria)",
+            "icon": "🌾",
+            "tag_es": "Infiltración Hídrica & Control de Erosión",
+            "tag_en": "Water Infiltration & Erosion Shield",
+            "primary_goal": "erosion_control",
+            "schedule": [
+                {"period_es": "Año 1", "period_en": "Year 1", "practice_es": "Siembra de Brachiaria brizantha o brizantha híbrida", "practice_en": "Brachiaria brizantha or hybrid tropical grass seeding", "role_es": "Cobertura densa inmediata que frena la escorrentía torrencial", "role_en": "Dense living carpet immediately dissipating runoff energy"},
+                {"period_es": "Año 1 (Intermedio)", "period_en": "Year 1 (Mid-cycle)", "practice_es": "Aprovechamiento con pastoreo controlado de terneros o corte de heno", "practice_en": "Managed rotational calf grazing or hay-making", "role_es": "Renta ganadera secundaria y reciclaje acelerado de nutrientes vía bosta", "role_en": "Secondary cattle income and accelerated manure nutrient cycling"},
+                {"period_es": "Año 2", "period_en": "Year 2", "practice_es": "Incorporación profunda del pasto con rastra pesada", "practice_en": "Deep grass sod incorporation with heavy disk equipment", "role_es": "Creación de una estructura grumosa esponjosa que absorbe temporales", "role_en": "Building a spongy, well-aggregated soil structure absorbing storms"},
+            ],
+            "partners": ["vetiver_brachiaria", "forage_peanut"],
+            "why_suggested_es": "Las lluvias de 3,500-4,500 mm anuales en Huetar Norte destruyen la estructura del suelo piñero si queda expuesto. Las raíces fasciculadas de Brachiaria reconstruyen agregados estables al agua.",
+            "why_suggested_en": "Annual rainfall of 3,500-4,500 mm in Northern Costa Rica destroys exposed pineapple soil structure. Fibrous Brachiaria roots rebuild water-stable aggregates.",
+            "evidence_supporting_es": "Los datos de erosión de IMN y los factores LS de SRTM advierten de pérdidas de hasta 55 t/ha/año en lomas piñeras. Brachiaria reduce esta pérdida a menos de 4 t/ha/año.",
+            "evidence_supporting_en": "IMN erosion assessments and SRTM LS factors warn of up to 55 t/ha/year soil loss on rolling pineapple terrain. Brachiaria slashes loss to under 4 t/ha/year.",
+            "benefits_es": [
+                "Aumento del 40% en la velocidad de infiltración de agua medida en campo.",
+                "Reducción total de cárcavas y zanjas de erosión en lomas de piñera.",
+                "Ingresos extra por alquiler de pastoreo o venta de pacas de heno en época seca.",
+            ],
+            "benefits_en": [
+                "40% increase in field water infiltration velocity.",
+                "Total elimination of erosion rills and gullies on undulating pineapple landscapes.",
+                "Supplemental income from cattle grazing leases or dry-season hay bale sales.",
+            ],
+            "information_gaps_es": "Tiempos óptimos de descomposición del colchón radicular del pasto antes de encamar la piña.",
+            "information_gaps_en": "Optimal decomposition timing of grass root sod prior to bed shaping.",
+            "risks_and_farmer_review_es": [
+                "Manejo cuidadoso de la incorporación para no dejar terrones que desnivelen las camas de siembra de piña.",
+            ],
+            "risks_and_farmer_review_en": [
+                "Thorough harrowing to prevent clod formation that interferes with pineapple bed-shapers.",
+            ],
+            "radar_scores": {
+                "soil_health": 91,
+                "pest_control": 84,
+                "water_efficiency": 95,
+                "economic_resilience": 82,
+                "erosion_control": 97,
+                "labor_ease": 74,
+            },
+        },
+    ],
+
+    "Avocado": [
+        {
+            "strategy_id": "avocado_baseline",
+            "is_baseline": True,
+            "name_es": "Estrategia 0: Monocultivo Tradicional (Línea Base)",
+            "name_en": "Strategy 0: Traditional Monoculture (Baseline)",
+            "icon": "🥑",
+            "tag_es": "Práctica Existente / Monocultivo Continuo",
+            "tag_en": "Existing Practice / Continuous Monoculture",
+            "primary_goal": "income",
+            "schedule": [
+                {"period_es": "Permanente", "period_en": "Permanent", "practice_es": "Huerto con calles limpiadas con herbicidas (suelo desnudo)", "practice_en": "Orchard with herbicide-cleared bare-soil inter-rows", "role_es": "Monocultivo continuo con alta exposición del plato radicular a calor y lluvia", "role_en": "Continuous monoculture exposing feeder roots to direct heat and torrential impact"}
+            ],
+            "partners": [],
+            "why_suggested_es": "Práctica extendida en Los Santos (Dota, Tarrazú) y San Mateo/Orotina para aguacate criollo/antillano. Busca evitar cualquier competencia aparente con el árbol.",
+            "why_suggested_en": "Widespread in Los Santos highlands and Pacific lowlands. Intended to eliminate perceived vegetative competition around trees.",
+            "evidence_supporting_es": "Genera fruta cotizada, pero ECOSTRESS detecta calentamiento extremo de las raíces superficiales (>32°C) y SMAP confirma rápido secado en veranillos.",
+            "evidence_supporting_en": "Produces high-value fruit, but ECOSTRESS detects extreme heating of shallow feeder roots (>32°C) and SMAP tracks rapid drying during spells.",
+            "benefits_es": [
+                "Facilidad para visualizar la fruta en el suelo y tránsito de podadores.",
+                "Cero competencia inicial de sombra para árboles recién plantados.",
+            ],
+            "benefits_en": [
+                "Easy visibility of fallen fruit and unimpeded pruner transit.",
+                "Zero initial shade competition for newly planted young fruit trees.",
+            ],
+            "information_gaps_es": "Profundidad exacta de la napa freática durante temporales de octubre en zonas altas.",
+            "information_gaps_en": "Exact seasonal water table depth during October tropical depressions in highlands.",
+            "risks_and_farmer_review_es": [
+                "Alta mortalidad por Phytophthora cinnamomi (tristeza del aguacate) por asfixia y salpicado de lluvia.",
+                "Erosión severa en las pendientes de montaña donde se cultiva el aguacate Hass.",
+                "Quemaduras en raíces superficiales absorbentes por altas temperaturas del suelo.",
+            ],
+            "risks_and_farmer_review_en": [
+                "High tree mortality from Phytophthora cinnamomi root rot due to waterlogging and rain splash.",
+                "Severe erosion on mountain slopes where Hass avocado is planted.",
+                "Feeder root scorch caused by high surface soil temperatures under bare ground.",
+            ],
+            "radar_scores": {
+                "soil_health": 40,
+                "pest_control": 35,
+                "water_efficiency": 42,
+                "economic_resilience": 62,
+                "erosion_control": 38,
+                "labor_ease": 76,
+            },
+        },
+        {
+            "strategy_id": "avocado_living_mulch_peanut",
+            "is_baseline": False,
+            "name_es": "Estrategia 1: Cobertura Viva Symbiótica Anti-Phytophthora (Maní Forrajero)",
+            "name_en": "Strategy 1: Symbiotic Living Cover Anti-Phytophthora (Forage Peanut)",
+            "icon": "🥜",
+            "tag_es": "Supresión Biológica de Tristeza & Fijación de N",
+            "tag_en": "Phytophthora Suppression & N Fixation",
+            "primary_goal": "soil_health",
+            "schedule": [
+                {"period_es": "Año 1", "period_en": "Year 1", "practice_es": "Siembra de Maní Forrajero (Arachis pintoi) en calles y entre-árboles", "practice_en": "Forage Peanut establishment across inter-rows and between trees", "role_es": "Creación de un tapete denso que suprime malezas y compite contra Phytophthora", "role_en": "Dense botanical carpet suppressing weeds and competing against Phytophthora"},
+                {"period_es": "Permanente", "period_en": "Permanent", "practice_es": "Mantenimiento con motoguadaña 2 veces al año descargando el rastrojo al plato", "practice_en": "Bi-annual brushcutting directing organic cuttings towards the tree dripline", "role_es": "Alimentación continua de micorrizas y aporte de nitrógeno orgánico", "role_en": "Continuous mycorrhizal feeding and biological N supplementation"},
+            ],
+            "partners": ["forage_peanut", "beans_legumes"],
+            "why_suggested_es": "Phytophthora cinnamomi es la principal causa de muerte de aguacates en Costa Rica. El maní forrajero fomenta bacterias antagonistas (Trichoderma y Pseudomonas) que inhiben al oomiceto patógeno.",
+            "why_suggested_en": "Phytophthora cinnamomi is the primary cause of avocado tree mortality in Costa Rica. Forage peanut fosters antagonistic bacteria and Trichoderma that suppress this oomycete.",
+            "evidence_supporting_es": "Ensayos en Los Santos reportan hasta un 50% menos de árboles infectados con tristeza en huertos con Arachis pintoi comparados con huertos con suelo desnudo.",
+            "evidence_supporting_en": "Highland trials report up to 50% fewer trees stricken with root rot in orchards managed with Arachis pintoi compared to bare-ground orchards.",
+            "benefits_es": [
+                "Reducción de hasta $400/ha en fungicidas fosfonatos y químicos de suelo.",
+                "Descenso de 4°C en la temperatura del suelo registrada por sensores térmicos espaciales.",
+                "Fijación biológica continua de nitrógeno que nutre directamente el huerto.",
+            ],
+            "benefits_en": [
+                "Savings up to $400/ha in synthetic phosphonate fungicides and chemical soil drenching.",
+                "4°C cooling of land surface temperature confirmed by spaceborne thermal sensors.",
+                "Continuous biological nitrogen fixation directly nourishing tree canopies.",
+            ],
+            "information_gaps_es": "Monitoreo de humedad en la base del tronco durante semanas con lluvias superiores a 300 mm.",
+            "information_gaps_en": "Moisture accumulation monitoring right at the trunk collar during weeks exceeding 300 mm rainfall.",
+            "risks_and_farmer_review_es": [
+                "Mantener el maní forrajero retirado 30 cm del tronco principal para evitar humedad excesiva en el cuello.",
+            ],
+            "risks_and_farmer_review_en": [
+                "Keep peanut foliage trimmed 30 cm back from the trunk collar to avoid collar moisture traps.",
+            ],
+            "radar_scores": {
+                "soil_health": 95,
+                "pest_control": 94,
+                "water_efficiency": 90,
+                "economic_resilience": 85,
+                "erosion_control": 96,
+                "labor_ease": 70,
+            },
+        },
+        {
+            "strategy_id": "avocado_juvenile_intercropping",
+            "is_baseline": False,
+            "name_es": "Estrategia 2: Intercalado en Calles Juveniles con Frijol & Maíz Criollo",
+            "name_en": "Strategy 2: Wide-Alley Intercropping in Juvenile Orchards",
+            "icon": "🌽",
+            "tag_es": "Flujo de Caja Inmediato & Seguridad Alimentaria",
+            "tag_en": "Immediate Cash Flow & Food Security",
+            "primary_goal": "income",
+            "schedule": [
+                {"period_es": "Años 1-3 (Mayo-Agosto)", "period_en": "Years 1-3 (May-Aug)", "practice_es": "Siembra de Frijol de grano en calles anchas (6 metros de espacio)", "practice_en": "Grain bean cultivation in wide 6-meter orchard alleys", "role_es": "Aporte de cosechas comerciales mientras los aguacateros crecen sin producir", "role_en": "Commercial grain crops generating income while avocado trees mature"},
+                {"period_es": "Años 1-3 (Set-Nov)", "period_en": "Years 1-3 (Sep-Nov)", "practice_es": "Siembra de Maíz criollo de porte bajo", "practice_en": "Low-stature native maize planting", "role_es": "Ingreso extra por grano y mulch para acolchar el plato del árbol", "role_en": "Extra grain cash and heavy straw mulch for young tree root zones"},
+                {"period_es": "Año 4+", "period_en": "Year 4+", "practice_es": "Cierre de copas de aguacate y transición a cobertura permanente", "practice_en": "Canopy closure and smooth transition to permanent cover", "role_es": "Entrada en producción comercial de fruta con inversión amortizada", "role_en": "Entering commercial fruit bearing with orchard establishment costs already paid"},
+            ],
+            "partners": ["beans_legumes", "maize_cereal"],
+            "why_suggested_es": "El aguacate tarda de 3 a 4 años en generar su primera cosecha comercial rentable. Intercalar cultivos de ciclo corto en las calles amplias capitaliza la tierra y cubre los costos de mano de obra.",
+            "why_suggested_en": "Avocado trees take 3-4 years to yield their first profitable harvest. Intercropping annual crops in wide alleys capitalizes land and pays maintenance labor costs.",
+            "evidence_supporting_es": "GPM y SRTM confirman condiciones climáticas estables en valles medios (Tarrazú, Dota, Puriscal) para la siembra de frijol durante la primera ventana de lluvias.",
+            "evidence_supporting_en": "GPM and SRTM confirm stable microclimates in mid-elevation valleys (Tarrazú, Dota, Puriscal) for bean sowing during the first rain window.",
+            "benefits_es": [
+                "Ingresos de $800 a $1,500/ha anuales durante los años críticos no productivos del aguacate.",
+                "Aprovechamiento integral del agua de lluvia y fertilizante aplicado en las calles.",
+                "Mejora de la seguridad alimentaria familiar del productor y sus trabajadores.",
+            ],
+            "benefits_en": [
+                "Revenues of $800 to $1,500/ha annually during the non-productive juvenile orchard years.",
+                "Comprehensive utilization of rainfall and fertility across wide inter-rows.",
+                "Substantial boost in household food security for farmers and agricultural workers.",
+            ],
+            "information_gaps_es": "Distancias mínimas de siembra del frijol al aguacatero según la tasa de crecimiento del patrón.",
+            "information_gaps_en": "Optimal buffer distance between bean rows and young tree canopies depending on rootstock vigor.",
+            "risks_and_farmer_review_es": [
+                "No cultivar a menos de 1.2 metros del tallo del aguacate para no dañar sus raíces delicadas durante el aporque.",
+            ],
+            "risks_and_farmer_review_en": [
+                "Maintain a 1.2m buffer clear of annuals around avocado stems to protect feeder roots from tillage.",
+            ],
+            "radar_scores": {
+                "soil_health": 85,
+                "pest_control": 78,
+                "water_efficiency": 82,
+                "economic_resilience": 97,
+                "erosion_control": 82,
+                "labor_ease": 62,
+            },
+        },
+        {
+            "strategy_id": "avocado_windbreak_drought",
+            "is_baseline": False,
+            "name_es": "Estrategia 3: Cortinas Agroforestales & Resiliencia a Sequías (Gandul / Vetiver)",
+            "name_en": "Strategy 3: Agroforestry Windbreaks & Drought Armor (Pigeon Pea / Vetiver)",
+            "icon": "🌾",
+            "tag_es": "Rompevientos & Raíces Descompactadoras",
+            "tag_en": "Windbreak Protection & Drought Shield",
+            "primary_goal": "water_conservation",
+            "schedule": [
+                {"period_es": "Perímetro & Borde", "period_en": "Perimeter & Edges", "practice_es": "Cortinas rompevientos de Gandul (Cajanus cajan) y Vetiver", "practice_en": "Pigeon Pea (Cajanus cajan) and Vetiver living windbreaks", "role_es": "Frenado de vientos alisios desecantes que causan caída prematura de flores", "role_en": "Dissipating drying trade winds that cause premature flower and fruitlet drop"},
+                {"period_es": "Calles Interiores", "period_en": "Inner Alleys", "practice_es": "Poda periódica de gandul para biomasa y aporte de fósforo al suelo", "practice_en": "Periodic lopping of pigeon pea for biomass and soil phosphorus release", "role_es": "Acolchado perimetral contra la evaporación de verano", "role_en": "Deep root mulch protecting topsoil from dry season desiccation"},
+            ],
+            "partners": ["cowpea_pigeonpea", "vetiver_brachiaria"],
+            "why_suggested_es": "Los vientos alisios de diciembre a marzo provocan la caída masiva de flores de aguacate y aceleran el estrés evaporativo detectado por ECOSTRESS. Las cortinas de gandul y vetiver crean un microclima protegido.",
+            "why_suggested_en": "Trade winds from Dec to Mar cause massive avocado flower drop and trigger intense ECOSTRESS evaporative stress. Pigeon pea and vetiver windbreaks create a buffered microclimate.",
+            "evidence_supporting_es": "NASA POWER registra ráfagas de viento de más de 45 km/h en collados montañosos. Las barreras vivas reducen la velocidad del viento a nivel de copa en un 60%.",
+            "evidence_supporting_en": "NASA POWER records wind gusts exceeding 45 km/h on mountain passes. Living barriers cut canopy-level wind velocities by up to 60%.",
+            "benefits_es": [
+                "Incremento de hasta un 30% en el cuajado efectivo de flores y retención de frutitos.",
+                "Ahorro notable de agua de riego al mitigar la tasa de evapotranspiración del huerto.",
+                "Aporte de grano comestible de gandul y leña fina para consumo rural.",
+            ],
+            "benefits_en": [
+                "Up to 30% increase in flower fruit-set and fruitlet retention.",
+                "Substantial irrigation water savings by lowering orchard evapotranspiration rates.",
+                "Yields nutritious edible pigeon peas and biomass for farm households.",
+            ],
+            "information_gaps_es": "Velocidad de crecimiento de diferentes variedades de gandul frente a heladas leves en alta montaña.",
+            "information_gaps_en": "Growth rates and cold tolerance of pigeon pea cultivars against high-altitude light frost events.",
+            "risks_and_farmer_review_es": [
+                "Podar el gandul anualmente para que no sobrepase la altura del aguacate ni proyecte sombra excesiva.",
+            ],
+            "risks_and_farmer_review_en": [
+                "Prune pigeon pea hedges annually so they do not overtop avocado crowns or cast excessive shade.",
+            ],
+            "radar_scores": {
+                "soil_health": 90,
+                "pest_control": 84,
+                "water_efficiency": 96,
+                "economic_resilience": 86,
+                "erosion_control": 95,
+                "labor_ease": 72,
+            },
+        },
+    ],
 }
 
+
+# ==============================================================================
+# 3. ANALYSIS SERVICE WITH FARMER PRIORITIES, SIMULATION, & VULNERABILITY TIMELINE
+# ==============================================================================
 
 class RotationAnalysisService:
-    """Calculates viability scores and agronomic performance for crop rotation vs monoculture."""
+    """
+    Advanced Crop Rotation & Agroecological Decision Engine.
+    Fulfills NASA Space Apps Challenge objectives:
+      - Multi-strategy comparison (including baseline)
+      - 5 analytical pillars (Why suggested, Evidence, Benefits, Gaps, Farmer risks)
+      - Dynamic farmer priority alignment
+      - What-if climate scenario simulation (adjusting temp and precip)
+      - 12-month agro-climatic vulnerability and bare-field transition calendar
+    """
 
     @classmethod
-    def evaluate_rotation(
+    def get_crop_strategies(cls, primary_crop: str) -> List[Dict[str, Any]]:
+        """Returns the list of rotation strategies available for the given crop."""
+        return MULTI_STRATEGY_CATALOG.get(primary_crop, MULTI_STRATEGY_CATALOG["Coffee"])
+
+    @classmethod
+    def evaluate_rotation_strategies(
         cls,
         primary_crop: str,
         primary_viability: int,
@@ -229,120 +1133,245 @@ class RotationAnalysisService:
         actual_altitude_m: float,
         actual_soil_moisture_m3_m3: float,
         actual_soil_type: str = "Inceptisol",
+        actual_slope_pct: float = 8.0,
+        farmer_priority: str = "balanced",
+        delta_temp_c: float = 0.0,
+        delta_precip_pct: float = 0.0,
     ) -> Dict[str, Any]:
         """
-        Calculates rotation viability index and compares rotation vs monoculture across 5 dimensions:
-          1. Salud del Suelo / Soil Health
-          2. Disrupción de Plagas / Pest Disruption
-          3. Eficiencia Hídrica / Water Efficiency
-          4. Resiliencia Económica / Economic Resilience
-          5. Mitigación de Erosión / Erosion Mitigation
+        Comprehensive evaluation of at least 3 rotation strategies (including baseline)
+        for a specific location, adjusted for farmer priorities and climate simulation.
         """
-        plan = CROP_ROTATION_PLANS.get(primary_crop, CROP_ROTATION_PLANS["Coffee"])
-        partner_1_key = plan["primary_partner"]
-        partner_2_key = plan["secondary_partner"]
-        p1 = ROTATION_PARTNERS[partner_1_key]
-        p2 = ROTATION_PARTNERS[partner_2_key]
+        raw_strategies = cls.get_crop_strategies(primary_crop)
 
-        # Environmental suitability for the rotational partners
-        # Check partner 1
-        p1_elev_min, p1_elev_max = p1["optimal_elev"]
-        p1_t_min, p1_t_max = p1["ideal_temp"]
-        p1_fit = 100
-        if not (p1_elev_min <= actual_altitude_m <= p1_elev_max):
-            p1_fit -= min(40, abs(actual_altitude_m - p1_elev_min if actual_altitude_m < p1_elev_min else actual_altitude_m - p1_elev_max) / 20)
-        if not (p1_t_min <= actual_temp_c <= p1_t_max):
-            p1_fit -= min(40, abs(actual_temp_c - p1_t_min if actual_temp_c < p1_t_min else actual_temp_c - p1_t_max) * 4)
-        p1_fit = max(35, round(p1_fit))
+        # Apply climate adjustments
+        simulated_temp = actual_temp_c + delta_temp_c
+        simulated_precip = max(200.0, actual_precip_mm * (1.0 + delta_precip_pct / 100.0))
+        # Simulated soil moisture decreases with higher temp and lower rainfall
+        sm_factor = (1.0 + delta_precip_pct / 200.0) - (delta_temp_c * 0.02)
+        simulated_sm = max(0.10, min(0.50, round(actual_soil_moisture_m3_m3 * sm_factor, 3)))
 
-        # Check partner 2
-        p2_elev_min, p2_elev_max = p2["optimal_elev"]
-        p2_t_min, p2_t_max = p2["ideal_temp"]
-        p2_fit = 100
-        if not (p2_elev_min <= actual_altitude_m <= p2_elev_max):
-            p2_fit -= min(40, abs(actual_altitude_m - p2_elev_min if actual_altitude_m < p2_elev_min else actual_altitude_m - p2_elev_max) / 20)
-        if not (p2_t_min <= actual_temp_c <= p2_t_max):
-            p2_fit -= min(40, abs(actual_temp_c - p2_t_min if actual_temp_c < p2_t_min else actual_temp_c - p2_t_max) * 4)
-        p2_fit = max(35, round(p2_fit))
+        evaluated_strategies: List[Dict[str, Any]] = []
 
-        # Rotation composite score
-        # Rotation boosts long-term viability by +8% to +18% over raw monoculture by regenerating soil
-        regeneration_bonus = 12 if "Andisol" in actual_soil_type or "Inceptisol" in actual_soil_type else 8
-        combined_viability = min(98, max(25, round(
-            (primary_viability * 0.55) + (p1_fit * 0.25) + (p2_fit * 0.20) + regeneration_bonus
-        )))
+        for strat in raw_strategies:
+            strat_id = strat["strategy_id"]
+            is_base = strat.get("is_baseline", False)
+            partners = [ROTATION_PARTNERS[p_key] for p_key in strat["partners"] if p_key in ROTATION_PARTNERS]
 
-        # Monoculture vs Rotation radar scores (0 to 100)
-        # Monoculture degrades soil and increases pest risk over time
-        mono_soil_health = max(30, round(primary_viability * 0.65))
-        rot_soil_health = min(96, round(primary_viability * 0.70 + 26))
+            # 1. Partner agroclimatic suitability
+            partner_fits = []
+            for p in partners:
+                p_fit = 100
+                elev_min, elev_max = p["optimal_elev"]
+                t_min, t_max = p["ideal_temp"]
+                sm_min, sm_max = p["tolerable_moisture"]
 
-        mono_pest_control = max(25, round(primary_viability * 0.55))
-        rot_pest_control = min(94, round(primary_viability * 0.60 + 30))
+                if not (elev_min <= actual_altitude_m <= elev_max):
+                    p_fit -= min(35, abs(actual_altitude_m - elev_min if actual_altitude_m < elev_min else actual_altitude_m - elev_max) / 25)
+                if not (t_min <= simulated_temp <= t_max):
+                    p_fit -= min(35, abs(simulated_temp - t_min if simulated_temp < t_min else simulated_temp - t_max) * 4.5)
+                if not (sm_min <= simulated_sm <= sm_max):
+                    p_fit -= min(30, abs(simulated_sm - sm_min if simulated_sm < sm_min else simulated_sm - sm_max) * 120)
+                partner_fits.append(max(30, round(p_fit)))
 
-        mono_water_eff = max(35, round(primary_viability * 0.70))
-        rot_water_eff = min(92, round(primary_viability * 0.75 + 18))
+            avg_partner_fit = round(sum(partner_fits) / len(partner_fits)) if partner_fits else 50
 
-        mono_econ_resilience = max(30, round(primary_viability * 0.60))
-        rot_econ_resilience = min(95, round(primary_viability * 0.65 + 28))
+            # 2. Dynamic Viability Score calculation under simulated climate
+            if is_base:
+                # Monoculture suffers heavily under climate deviation (drought or heatwave)
+                climate_penalty = 0
+                if delta_temp_c > 1.0:
+                    climate_penalty += (delta_temp_c - 1.0) * 6.5
+                if delta_precip_pct < -15.0:
+                    climate_penalty += abs(delta_precip_pct + 15.0) * 0.45
+                elif delta_precip_pct > 25.0:
+                    climate_penalty += (delta_precip_pct - 25.0) * 0.30
+                viability_score = max(18, min(95, round(primary_viability - climate_penalty)))
+            else:
+                # Multi-crop rotation is buffered against climate extremes
+                resilience_buffer = 10 if ("Andisol" in actual_soil_type or "Inceptisol" in actual_soil_type) else 6
+                if actual_slope_pct > 15.0 and strat["primary_goal"] == "erosion_control":
+                    resilience_buffer += 6
 
-        mono_erosion_control = max(25, round(primary_viability * 0.60 - (10 if actual_altitude_m > 800 else 0)))
-        rot_erosion_control = min(98, round(primary_viability * 0.70 + 25))
+                # Under climate stress, rotation penalty is much milder than monoculture
+                climate_impact = 0
+                if delta_temp_c > 1.5:
+                    climate_impact += (delta_temp_c - 1.5) * 2.5
+                if delta_precip_pct < -20.0:
+                    climate_impact += abs(delta_precip_pct + 20.0) * 0.18
+                elif delta_precip_pct > 30.0:
+                    climate_impact += (delta_precip_pct - 30.0) * 0.15
 
-        dimensions_es = [
-            "Salud del Suelo (N & M.O.)",
-            "Control de Plagas & Nemátodos",
-            "Eficiencia y Retención Hídrica",
-            "Resiliencia Económica",
-            "Protección contra Erosión",
-        ]
-        dimensions_en = [
-            "Soil Health (N & O.M.)",
-            "Pest & Nematode Control",
-            "Water Efficiency & Retention",
-            "Economic Resilience",
-            "Erosion Protection",
-        ]
+                base_combo = (primary_viability * 0.50) + (avg_partner_fit * 0.35) + resilience_buffer
+                viability_score = max(25, min(98, round(base_combo - climate_impact)))
 
-        mono_values = [
-            mono_soil_health,
-            mono_pest_control,
-            mono_water_eff,
-            mono_econ_resilience,
-            mono_erosion_control,
-        ]
-        rot_values = [
-            rot_soil_health,
-            rot_pest_control,
-            rot_water_eff,
-            rot_econ_resilience,
-            rot_erosion_control,
-        ]
+            # 3. Dynamic Farmer Priority Alignment Score
+            radar = dict(strat["radar_scores"])
+            # Adjust radar scores if under climate simulation
+            if delta_precip_pct < -20.0 or delta_temp_c > 1.5:
+                # Water efficiency and soil health become even more critical
+                if not is_base:
+                    radar["water_efficiency"] = min(99, radar["water_efficiency"] + 3)
+                    radar["soil_health"] = min(99, radar["soil_health"] + 2)
+                else:
+                    radar["water_efficiency"] = max(15, radar["water_efficiency"] - 12)
+                    radar["economic_resilience"] = max(20, radar["economic_resilience"] - 10)
 
-        # Is rotation a better alternative?
-        net_advantage_pct = round(sum(rot_values) / len(rot_values) - sum(mono_values) / len(mono_values))
-        is_recommended = net_advantage_pct > 8
+            # Weighting according to farmer's selected priority
+            if farmer_priority == "soil_health":
+                weights = {"soil_health": 0.40, "pest_control": 0.20, "water_efficiency": 0.15, "economic_resilience": 0.10, "erosion_control": 0.15}
+            elif farmer_priority == "water_conservation":
+                weights = {"soil_health": 0.15, "pest_control": 0.10, "water_efficiency": 0.45, "economic_resilience": 0.15, "erosion_control": 0.15}
+            elif farmer_priority == "income":
+                weights = {"soil_health": 0.10, "pest_control": 0.15, "water_efficiency": 0.15, "economic_resilience": 0.45, "erosion_control": 0.15}
+            elif farmer_priority == "pest_control":
+                weights = {"soil_health": 0.20, "pest_control": 0.45, "water_efficiency": 0.15, "economic_resilience": 0.10, "erosion_control": 0.10}
+            elif farmer_priority == "erosion_control":
+                weights = {"soil_health": 0.15, "pest_control": 0.10, "water_efficiency": 0.15, "economic_resilience": 0.10, "erosion_control": 0.50}
+            else:  # "balanced"
+                weights = {"soil_health": 0.22, "pest_control": 0.20, "water_efficiency": 0.20, "economic_resilience": 0.20, "erosion_control": 0.18}
+
+            farmer_score = round(sum(radar[k] * w for k, w in weights.items()))
+
+            eval_strat = dict(strat)
+            eval_strat["viability_score"] = viability_score
+            eval_strat["partner_fits"] = partner_fits
+            eval_strat["avg_partner_fit"] = avg_partner_fit
+            eval_strat["farmer_alignment_score"] = farmer_score
+            eval_strat["radar_scores"] = radar
+            evaluated_strategies.append(eval_strat)
+
+        # Identify baseline viability and calculate net advantages
+        baseline_strat = next((s for s in evaluated_strategies if s.get("is_baseline")), evaluated_strategies[0])
+        baseline_score = baseline_strat["viability_score"]
+
+        for s in evaluated_strategies:
+            s["net_advantage_vs_baseline"] = s["viability_score"] - baseline_score
+
+        # Determine the top recommended strategy based on farmer alignment score + viability
+        non_baseline_strategies = [s for s in evaluated_strategies if not s.get("is_baseline")]
+        best_strategy = max(
+            non_baseline_strategies if non_baseline_strategies else evaluated_strategies,
+            key=lambda x: (x["farmer_alignment_score"] * 0.6 + x["viability_score"] * 0.4)
+        )
+
+        for s in evaluated_strategies:
+            s["is_top_recommendation"] = (s["strategy_id"] == best_strategy["strategy_id"])
+
+        # 4. Generate 12-Month Agro-Climatic Vulnerability & Bare-Field Transition Calendar
+        calendar_timeline = cls._generate_vulnerability_calendar(
+            primary_crop=primary_crop,
+            actual_precip_mm=simulated_precip,
+            actual_temp_c=simulated_temp,
+            actual_slope_pct=actual_slope_pct,
+            recommended_strategy=best_strategy,
+        )
 
         return {
             "primary_crop": primary_crop,
-            "primary_viability": primary_viability,
-            "rotation_type": plan["rotation_type"],
-            "schedule": plan["schedule"],
-            "partner_1": p1,
-            "partner_1_fit": p1_fit,
-            "partner_2": p2,
-            "partner_2_fit": p2_fit,
-            "combined_viability": combined_viability,
-            "net_advantage_pct": net_advantage_pct,
-            "is_recommended": is_recommended,
-            "benefits_es": plan["benefits_es"],
-            "benefits_en": plan["benefits_en"],
-            "risks_es": plan["risks_es"],
-            "risks_en": plan["risks_en"],
-            "comparison": {
-                "dimensions_es": dimensions_es,
-                "dimensions_en": dimensions_en,
-                "monoculture_scores": mono_values,
-                "rotation_scores": rot_values,
-            },
+            "baseline_viability": baseline_score,
+            "simulated_temp_c": simulated_temp,
+            "simulated_precip_mm": simulated_precip,
+            "simulated_soil_moisture": simulated_sm,
+            "farmer_priority": farmer_priority,
+            "delta_temp_c": delta_temp_c,
+            "delta_precip_pct": delta_precip_pct,
+            "strategies": evaluated_strategies,
+            "recommended_strategy": best_strategy,
+            "vulnerability_calendar": calendar_timeline,
         }
+
+    @classmethod
+    def _generate_vulnerability_calendar(
+        cls,
+        primary_crop: str,
+        actual_precip_mm: float,
+        actual_temp_c: float,
+        actual_slope_pct: float,
+        recommended_strategy: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        """
+        Computes 12-month agro-climatic indicators:
+          - Monthly precipitation (mm) and temperature (°C)
+          - Climate Stress Index (0-100)
+          - Monoculture Bare-Soil Vulnerability Index (0-100)
+          - Rotational Vegetative Cover Index (0-100)
+          - Recommended Field Activity / Window
+        """
+        months_es = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Set", "Oct", "Nov", "Dic"]
+        months_en = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+        # Pacific & Central Valley normalized precipitation distribution curve
+        precip_weights = [0.015, 0.015, 0.025, 0.055, 0.125, 0.120, 0.085, 0.130, 0.165, 0.180, 0.065, 0.020]
+        temp_offsets = [-0.5, 0.3, 0.8, 1.2, 0.4, -0.2, 0.0, -0.1, -0.3, -0.6, -0.7, -0.3]
+
+        calendar = []
+        for i in range(12):
+            m_precip = round(actual_precip_mm * precip_weights[i])
+            m_temp = round(actual_temp_c + temp_offsets[i], 1)
+
+            # Climate Stress: high during extreme dry (Jan-Mar) and extreme torrential (Sep-Oct)
+            if m_precip < 50:
+                stress = round(70 + (50 - m_precip) * 0.5)
+                phase_type = "drought_stress"
+            elif m_precip > 350:
+                stress = round(65 + min(30, (m_precip - 350) * 0.15) + (actual_slope_pct * 0.5))
+                phase_type = "excess_runoff"
+            elif 60 <= m_precip <= 110 and i in [6, 7]:  # Veranillo de San Juan
+                stress = 55
+                phase_type = "veranillo_dry_spell"
+            else:
+                stress = max(15, round(30 - (m_precip / 50)))
+                phase_type = "optimal_growing"
+            stress = min(98, max(12, stress))
+
+            # Bare Soil Risk in Monoculture: high after harvest in dry/early wet or heavy weeding
+            if i in [0, 1, 2, 3]:  # Jan-Apr (Dry season / post-harvest)
+                bare_soil_mono = 85
+            elif i in [8, 9]:     # Sep-Oct (Heavy rain with bare soil = massive erosion)
+                bare_soil_mono = 65
+            else:
+                bare_soil_mono = 45
+
+            # Rotational Soil Cover: cover crop or mulch shields the soil continuously
+            if i in [0, 1, 2, 3]:
+                rot_cover = 82  # Protected by lignified mulch / living stolons
+            elif i in [4, 5]:
+                rot_cover = 75  # Emergence of sown cover crops
+            elif i in [6, 7]:
+                rot_cover = 90  # Full vegetative canopy during veranillo
+            else:
+                rot_cover = 95  # Dense root mat absorbing intense rains
+
+            # Contextual field action recommendation
+            if i in [3, 4]:
+                action_es = "🌱 Siembra de leguminosas de cobertura con las primeras lluvias"
+                action_en = "🌱 Sowing cover legumes with initial monsoon rains"
+            elif i in [6, 7]:
+                action_es = "✂️ Chapea y distribución de mulch para retener humedad en el Veranillo"
+                action_en = "✂️ Slashing and mulch spreading to retain moisture during midsummer drought"
+            elif i in [8, 9]:
+                action_es = "🛡️ Monitoreo de drenajes y mantenimiento de barreras vivas antierosión"
+                action_en = "🛡️ Drainage ditch monitoring and living barrier erosion maintenance"
+            elif i in [10, 11]:
+                action_es = "🌾 Inicio de cosecha principal y siembra de abonos verdes de entrezafra"
+                action_en = "🌾 Main crop harvest onset and inter-season green manure seeding"
+            else:
+                action_es = "☀️ Acolchado superficial protegiendo el suelo de la radiación directa"
+                action_en = "☀️ Surface mulching shielding topsoil from solar radiation"
+
+            calendar.append({
+                "month_num": i + 1,
+                "month_es": months_es[i],
+                "month_en": months_en[i],
+                "precipitation_mm": m_precip,
+                "temperature_c": m_temp,
+                "climate_stress_index": stress,
+                "bare_soil_monoculture_index": bare_soil_mono,
+                "rotational_cover_index": rot_cover,
+                "phase_type": phase_type,
+                "action_es": action_es,
+                "action_en": action_en,
+            })
+
+        return calendar

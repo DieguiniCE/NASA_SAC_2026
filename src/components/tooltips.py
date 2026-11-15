@@ -39,6 +39,38 @@ SCIENTIFIC_DICTIONARY: Dict[str, Dict[str, str]] = {
         "definition": "Satellites scan massive areas from space to find broader climate trends, while ground stations measure exact local weather. Combining them gives us the most accurate picture!",
         "definition_es": "Los satélites de la NASA escanean áreas continuas para captar patrones climáticos amplios, mientras las estaciones del IMN miden el clima local exacto. ¡Combinarlos interpola las condiciones más precisas!",
         "sensor": "Fusión NASA Earthdata + IMN Costa Rica"
+    },
+    "NDVI": {
+        "term_es": "Índice de Vegetación (NDVI)",
+        "category": "Teledetección Óptica",
+        "category_en": "Optical Remote Sensing",
+        "definition": "Normalized Difference Vegetation Index: measures canopy greenness, density, and photosynthetic vigor by comparing red and near-infrared reflectance.",
+        "definition_es": "Índice de Vegetación de Diferencia Normalizada: mide el verdor, densidad foliar y vigor fotosintético comparando la reflectancia en el rojo y el infrarrojo cercano.",
+        "sensor": "NASA Landsat 8/9 OLI & MODIS / VIIRS"
+    },
+    "Frost Risk": {
+        "term_es": "Riesgo de Heladas",
+        "category": "Agrometeorología Extrema",
+        "category_en": "Extreme Agrometeorology",
+        "definition": "The probability of land surface temperature dropping below 0-3°C, critical in high-elevation cordilleras (Cerro de la Muerte, Tarrazú, Irazú) damaging coffee or fruit blossoms.",
+        "definition_es": "Probabilidad de que la temperatura caiga por debajo de 0-3°C en zonas altas de cordillera (Cerro de la Muerte, Tarrazú, Irazú), congelando tejidos tiernos de café o frutales.",
+        "sensor": "NASA ECOSTRESS LST & IMN Red de Altura"
+    },
+    "Biological Nitrogen Fixation": {
+        "term_es": "Fijación Biológica de Nitrógeno",
+        "category": "Salud del Suelo & Microbioma",
+        "category_en": "Soil Health & Microbiome",
+        "definition": "The biological process where leguminous plants symbiotically host Rhizobium bacteria in root nodules, converting atmospheric N2 into plant-available ammonium without synthetic fertilizer.",
+        "definition_es": "Proceso biológico donde leguminosas (Canavalia, Frijol, Crotalaria) alojan bacterias Rhizobium en nódulos radiculares, convirtiendo el nitrógeno atmosférico en abono natural.",
+        "sensor": "Agroecología Tropical & Modelado de Biomasa GEDI"
+    },
+    "Harmonized Resolution Grid": {
+        "term_es": "Cuadrícula de Análisis Multirresolución",
+        "category": "Fusión de Datos Espaciales",
+        "category_en": "Spatial Data Fusion",
+        "definition": "Resampling and harmonizing satellite datasets with diverse spatial grids (SMAP 9km, GPM 10km, ECOSTRESS 70m, SRTM 30m) into a unified agricultural decision layer.",
+        "definition_es": "Remuestreo y armonización de múltiples satélites con resoluciones dispares (SMAP 9km, GPM 10km, ECOSTRESS 70m, SRTM 30m) en una cuadrícula analítica coherente para Costa Rica.",
+        "sensor": "NASA Earthdata GIS Fusion Engine"
     }
 }
 
