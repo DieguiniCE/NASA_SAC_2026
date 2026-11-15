@@ -131,84 +131,111 @@ def _generate_synthetic_cr_climatology(lat: float, lon: float) -> Dict[str, Any]
     }
 
 
+
+
+MONTH_KEYS = ("JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+              "JUL", "AUG", "SEP", "OCT", "NOV", "DEC")
+
+
+def _valid(value, low, high):
+    return isinstance(value, (int, float)) and math.isfinite(value) and low <= value <= high
+
+
+def _normalize_months(values):
+    """Accept POWER named months and numeric month representations."""
+    return {month: values.get(month, values.get(str(i), values.get(f"{i:02d}")))
+            for i, month in enumerate(MONTH_KEYS, 1)}
+
+
+def parse_power_climatology(raw_data, lat, lon):
+    raw = raw_data.get("properties", {}).get("parameter", {})
+    ranges = {"T2M": (-60, 65), "T2M_MAX": (-60, 65), "T2M_MIN": (-60, 65),
+              "PRECTOTCORR": (0, 2000), "RH2M": (0, 100), "WS2M": (0, 100)}
+    parameters = {}
+    for key, limits in ranges.items():
+        monthly = _normalize_months(raw.get(key, {}))
+        if any(not _valid(value, *limits) for value in monthly.values()):
+            raise ValueError(f"Incomplete or invalid POWER parameter: {key}")
+        monthly["ANN"] = sum(monthly[m] * MONTH_DAYS[i] for i, m in enumerate(MONTH_KEYS)) / 365
+        parameters[key] = monthly
+    units = raw_data.get("parameters", {}).get("PRECTOTCORR", {}).get("units", "mm/day").lower()
+    multiplier = {"mm/day": 1, "mm/hour": 24, "mm/hr": 24}.get(units)
+    if multiplier is None:
+        raise ValueError(f"Unsupported precipitation units: {units}")
+    daily = {k: v * multiplier for k, v in parameters["PRECTOTCORR"].items()}
+    parameters["PRECTOTCORR"] = daily
+    parameters["PRECTOT_MONTHLY"] = {m: round(daily[m] * MONTH_DAYS[i], 1)
+                                    for i, m in enumerate(MONTH_KEYS)}
+    parameters["ALLSKY_SFC_SW_DWN"] = raw.get("ALLSKY_SFC_SW_DWN", {})
+    coordinates = raw_data.get("geometry", {}).get("coordinates", [])
+    elevation = coordinates[2] if len(coordinates) > 2 and _valid(coordinates[2], -100, 9000) else None
+    return {
+        "is_simulated": False, "source": "NASA POWER / MERRA-2 climatología",
+        "period": raw_data.get("header", {}).get("range", "Climatología NASA POWER"),
+        "elevation_m": elevation, "closest_known_place": find_closest_location(lat, lon)["name"],
+        "parameters": parameters,
+        "annual_summary": {
+            "mean_temp_c": round(parameters["T2M"]["ANN"], 1),
+            "max_temp_c": round(parameters["T2M_MAX"]["ANN"], 1),
+            "min_temp_c": round(parameters["T2M_MIN"]["ANN"], 1),
+            "annual_precipitation_mm": round(sum(parameters["PRECTOT_MONTHLY"].values()), 1),
+            "mean_relative_humidity": round(parameters["RH2M"]["ANN"], 1),
+            "dry_months_count": sum(v < 60 for v in parameters["PRECTOT_MONTHLY"].values()),
+        },
+    }
+
+
 def fetch_nasa_power_climatology(lat: float, lon: float, timeout_sec: int = 8) -> Dict[str, Any]:
-    """
-    Queries NASA POWER Agroclimatology (AG) Climatology API for point coordinates.
-    Falls back gracefully to high-resolution Costa Rica ecological model if offline.
-    """
-    params = {
-        "parameters": ",".join(NASA_PARAMETERS),
-        "community": NASA_POWER_COMMUNITY,
-        "longitude": round(lon, 4),
-        "latitude": round(lat, 4),
-        "format": "JSON"
-    }
-
-    headers = {
-        "User-Agent": "NASA-Space-Apps-2026-AgroClima-CR/1.0"
-    }
-
+    reason = None
     try:
-        response = requests.get(
-            NASA_POWER_BASE_URL,
-            params=params,
-            headers=headers,
-            timeout=timeout_sec
-        )
-        if response.status_code == 200:
-            raw_data = response.json()
-            raw_params = raw_data.get("properties", {}).get("parameter", {})
-            header_info = raw_data.get("header", {})
-            elevation = header_info.get("elevation", None)
+        response = requests.get(NASA_POWER_BASE_URL, params={
+            "parameters": ",".join(NASA_PARAMETERS), "community": NASA_POWER_COMMUNITY,
+            "longitude": round(lon, 4), "latitude": round(lat, 4), "format": "JSON",
+        }, timeout=timeout_sec)
+        response.raise_for_status()
+        return parse_power_climatology(response.json(), lat, lon)
+    except (requests.RequestException, ValueError, TypeError, KeyError) as exc:
+        reason = type(exc).__name__
+    fallback = _generate_synthetic_cr_climatology(lat, lon)
+    fallback["fallback_reason"] = reason
+    fallback["period"] = "Modelo regional sin observaciones históricas verificadas"
+    return fallback
 
-            # Compute monthly precipitation totals (mm/month)
-            month_keys = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
-            precip_daily = raw_params.get("PRECTOTCORR", {})
-            precip_monthly = {}
-            annual_rain = 0.0
 
-            for i, m_key in enumerate(month_keys):
-                daily_rate = precip_daily.get(m_key, 0.0)
-                if daily_rate is None or daily_rate < 0:
-                    daily_rate = 0.0
-                m_total = round(daily_rate * MONTH_DAYS[i], 1)
-                precip_monthly[m_key] = m_total
-                annual_rain += m_total
-
-            t2m_data = raw_params.get("T2M", {})
-            t2m_max_data = raw_params.get("T2M_MAX", {})
-            t2m_min_data = raw_params.get("T2M_MIN", {})
-            rh_data = raw_params.get("RH2M", {})
-
-            # Count dry months (precipitation < 60mm/month is standard agroclimate definition)
-            dry_months = sum(1 for m, p in precip_monthly.items() if p < 60.0)
-
-            return {
-                "is_simulated": False,
-                "source": "NASA POWER Agroclimatology (AG) API Live",
-                "elevation_m": elevation,
-                "closest_known_place": find_closest_location(lat, lon)["name"],
-                "parameters": {
-                    "T2M": t2m_data,
-                    "T2M_MAX": t2m_max_data,
-                    "T2M_MIN": t2m_min_data,
-                    "PRECTOTCORR": precip_daily,
-                    "PRECTOT_MONTHLY": precip_monthly,
-                    "RH2M": rh_data,
-                    "ALLSKY_SFC_SW_DWN": raw_params.get("ALLSKY_SFC_SW_DWN", {}),
-                    "WS2M": raw_params.get("WS2M", {}),
-                },
-                "annual_summary": {
-                    "mean_temp_c": round(t2m_data.get("ANN", 22.0), 1),
-                    "max_temp_c": round(t2m_max_data.get("ANN", 27.0), 1),
-                    "min_temp_c": round(t2m_min_data.get("ANN", 17.0), 1),
-                    "annual_precipitation_mm": round(annual_rain, 1),
-                    "mean_relative_humidity": round(rh_data.get("ANN", 78.0), 1),
-                    "dry_months_count": dry_months,
-                }
-            }
-    except Exception as e:
-        # Network unreachable or timeout -> use high-accuracy calibrated fallback
-        pass
-
-    return _generate_synthetic_cr_climatology(lat, lon)
+def fetch_power_monthly_history(lat, lon, years=5, today=None, timeout_sec=8):
+    """Five complete historical years; no future or partial annual totals."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    from calendar import monthrange
+    today = today or datetime.now(ZoneInfo("America/Costa_Rica")).date()
+    end = today.year - 1
+    start = end - years + 1
+    try:
+        response = requests.get("https://power.larc.nasa.gov/api/temporal/monthly/point",
+            params={"parameters": "T2M,T2M_MIN,PRECTOTCORR,WS2M", "community": "AG",
+                    "latitude": round(lat, 4), "longitude": round(lon, 4),
+                    "start": start, "end": end, "format": "JSON"}, timeout=timeout_sec)
+        response.raise_for_status()
+        raw = response.json()
+        data = raw["properties"]["parameter"]
+        units = raw.get("parameters", {}).get("PRECTOTCORR", {}).get("units", "mm/day").lower()
+        factor = {"mm/day": 1, "mm/hour": 24, "mm/hr": 24}.get(units)
+        if factor is None:
+            raise ValueError("Unknown rainfall units")
+        records = []
+        for year in range(start, end + 1):
+            for month in range(1, 13):
+                key = f"{year}{month:02d}"
+                p, temp, wind, tmin = (data.get(k, {}).get(key) for k in
+                                      ("PRECTOTCORR", "T2M", "WS2M", "T2M_MIN"))
+                if not (_valid(p, 0, 2000) and _valid(temp, -60, 65)):
+                    continue
+                records.append({"year": year, "month": month,
+                    "precipitation_mm": round(p * factor * monthrange(year, month)[1], 1),
+                    "temperature_c": temp, "wind_m_s": wind if _valid(wind, 0, 100) else None,
+                    "min_temperature_c": tmin if _valid(tmin, -60, 65) else None})
+        return {"source": "NASA POWER / MERRA-2 mensual", "is_simulated": False,
+                "period": f"{start}–{end}", "records": records, "expected_months": years * 12}
+    except (requests.RequestException, ValueError, KeyError, TypeError):
+        return {"source": "Sin serie interanual disponible", "is_simulated": False,
+                "period": f"{start}–{end}", "records": [], "expected_months": years * 12}

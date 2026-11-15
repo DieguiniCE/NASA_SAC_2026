@@ -45,8 +45,8 @@ ROTATION_PARTNERS: Dict[str, Dict[str, Any]] = {
         "water_needs_en": "Low (fast 60-90 day establishment, high water-use efficiency)",
         "soil_benefit_es": "Aporte masivo de biomasa aérea (6-10 t/ha MS), biofumigación contra nemátodos agalladores.",
         "soil_benefit_en": "Massive above-ground biomass (6-10 t/ha DM), natural biofumigation against root-knot nematodes.",
-        "pest_break_es": "Alcaloides pirrolizidínicos que erradican nemátodos (Meloidogyne, Pratylenchus).",
-        "pest_break_en": "Pyrrolizidine alkaloids that eradicate parasitic nematodes (Meloidogyne, Pratylenchus).",
+        "pest_break_es": "El efecto sobre nemátodos depende de especie y población; confirmar hospedantes localmente.",
+        "pest_break_en": "Nematode suppression depends on species and population; verify local host status.",
         "market_potential_es": "Ahorro directo en agroquímicos y nematicidas sintéticos ($250-400/ha).",
         "market_potential_en": "Direct savings on synthetic nematicides and fertilizers ($250-400/ha).",
         "optimal_elev": (0, 1900),
@@ -1147,271 +1147,149 @@ MULTI_STRATEGY_CATALOG: Dict[str, List[Dict[str, Any]]] = {
 # 3. ANALYSIS SERVICE WITH FARMER PRIORITIES, SIMULATION, & VULNERABILITY TIMELINE
 # ==============================================================================
 
+
+
 class RotationAnalysisService:
-    """
-    Advanced Crop Rotation & Agroecological Decision Engine.
-    Fulfills NASA Space Apps Challenge objectives:
-      - Multi-strategy comparison (including baseline)
-      - 5 analytical pillars (Why suggested, Evidence, Benefits, Gaps, Farmer risks)
-      - Dynamic farmer priority alignment
-      - What-if climate scenario simulation (adjusting temp and precip)
-      - 12-month agro-climatic vulnerability and bare-field transition calendar
-    """
+    """Comparable heuristic scores with feasibility gating and one climate scenario."""
+
+    PRIORITY_WEIGHTS = {
+        "balanced": (0.22, 0.20, 0.20, 0.20, 0.18),
+        "soil_health": (0.50, 0.15, 0.15, 0.10, 0.10),
+        "water_conservation": (0.15, 0.10, 0.50, 0.10, 0.15),
+        "income": (0.10, 0.10, 0.15, 0.55, 0.10),
+        "pest_control": (0.15, 0.55, 0.10, 0.10, 0.10),
+        "erosion_control": (0.15, 0.10, 0.15, 0.10, 0.50),
+    }
+    RADAR_KEYS = ("soil_health", "pest_control", "water_efficiency", "economic_resilience", "erosion_control")
 
     @classmethod
-    def get_crop_strategies(cls, primary_crop: str) -> List[Dict[str, Any]]:
-        """Returns the list of rotation strategies available for the given crop."""
-        return MULTI_STRATEGY_CATALOG.get(primary_crop, MULTI_STRATEGY_CATALOG["Coffee"])
+    def get_crop_strategies(cls, primary_crop):
+        if primary_crop not in MULTI_STRATEGY_CATALOG:
+            raise ValueError(f"Unknown primary crop: {primary_crop}")
+        from copy import deepcopy
+        return deepcopy(MULTI_STRATEGY_CATALOG[primary_crop])
 
     @classmethod
     def evaluate_rotation_strategies(
-        cls,
-        primary_crop: str,
-        primary_viability: int,
-        actual_temp_c: float,
-        actual_precip_mm: float,
-        actual_altitude_m: float,
-        actual_soil_moisture_m3_m3: float,
-        actual_soil_type: str = "Inceptisol",
-        actual_slope_pct: float = 8.0,
-        farmer_priority: str = "balanced",
-        delta_temp_c: float = 0.0,
-        delta_precip_pct: float = 0.0,
-    ) -> Dict[str, Any]:
-        """
-        Comprehensive evaluation of at least 3 rotation strategies (including baseline)
-        for a specific location, adjusted for farmer priorities and climate simulation.
-        """
-        raw_strategies = cls.get_crop_strategies(primary_crop)
-
-        # Apply climate adjustments
-        simulated_temp = actual_temp_c + delta_temp_c
-        simulated_precip = max(200.0, actual_precip_mm * (1.0 + delta_precip_pct / 100.0))
-        # Simulated soil moisture decreases with higher temp and lower rainfall
-        sm_factor = (1.0 + delta_precip_pct / 200.0) - (delta_temp_c * 0.02)
-        simulated_sm = max(0.10, min(0.50, round(actual_soil_moisture_m3_m3 * sm_factor, 3)))
-
-        evaluated_strategies: List[Dict[str, Any]] = []
-
-        for strat in raw_strategies:
-            strat_id = strat["strategy_id"]
-            is_base = strat.get("is_baseline", False)
-            partners = [ROTATION_PARTNERS[p_key] for p_key in strat["partners"] if p_key in ROTATION_PARTNERS]
-
-            # 1. Partner agroclimatic suitability
-            partner_fits = []
-            for p in partners:
-                p_fit = 100
-                elev_min, elev_max = p["optimal_elev"]
-                t_min, t_max = p["ideal_temp"]
-                sm_min, sm_max = p["tolerable_moisture"]
-
-                if not (elev_min <= actual_altitude_m <= elev_max):
-                    p_fit -= min(35, abs(actual_altitude_m - elev_min if actual_altitude_m < elev_min else actual_altitude_m - elev_max) / 25)
-                if not (t_min <= simulated_temp <= t_max):
-                    p_fit -= min(35, abs(simulated_temp - t_min if simulated_temp < t_min else simulated_temp - t_max) * 4.5)
-                if not (sm_min <= simulated_sm <= sm_max):
-                    p_fit -= min(30, abs(simulated_sm - sm_min if simulated_sm < sm_min else simulated_sm - sm_max) * 120)
-                partner_fits.append(max(30, round(p_fit)))
-
-            avg_partner_fit = round(sum(partner_fits) / len(partner_fits)) if partner_fits else 50
-
-            # 2. Dynamic Viability Score calculation under simulated climate
-            if is_base:
-                # Monoculture suffers heavily under climate deviation (drought or heatwave)
-                climate_penalty = 0
-                if delta_temp_c > 1.0:
-                    climate_penalty += (delta_temp_c - 1.0) * 6.5
-                if delta_precip_pct < -15.0:
-                    climate_penalty += abs(delta_precip_pct + 15.0) * 0.45
-                elif delta_precip_pct > 25.0:
-                    climate_penalty += (delta_precip_pct - 25.0) * 0.30
-                viability_score = max(18, min(95, round(primary_viability - climate_penalty)))
+        cls, primary_crop, primary_viability, actual_temp_c, actual_precip_mm,
+        actual_altitude_m, actual_soil_moisture_m3_m3, actual_soil_type="Inceptisol",
+        actual_slope_pct=8.0, farmer_priority="balanced", delta_temp_c=0.0,
+        delta_precip_pct=0.0, irrigation=False, shade=False, monthly_climate=None,
+        vegetation_records=None,
+    ):
+        from src.models.sensitivity_viability_model import SensitivityViabilityModel as Model
+        from src.data.crops_catalog import get_crop_by_name
+        strategies = cls.get_crop_strategies(primary_crop)
+        if farmer_priority not in cls.PRIORITY_WEIGHTS:
+            raise ValueError(f"Unknown farmer priority: {farmer_priority}")
+        # primary_viability retained for callers; recalculate from the shared model to
+        # prevent stale baselines and applying a climate penalty twice.
+        primary = Model.calculate_viability(
+            get_crop_by_name(primary_crop), actual_temp_c, actual_precip_mm, actual_altitude_m,
+            actual_soil_moisture_m3_m3, actual_soil_type, delta_temp_c=delta_temp_c,
+            delta_precip_pct=delta_precip_pct, irrigation=irrigation, shade=shade,
+            include_uncertainty=False)
+        baseline = primary["success_percentage"]
+        values = primary["actual_values"]
+        weights = dict(zip(cls.RADAR_KEYS, cls.PRIORITY_WEIGHTS[farmer_priority]))
+        for strategy in strategies:
+            fits = []
+            for key in strategy["partners"]:
+                partner = ROTATION_PARTNERS[key]
+                t_lo, t_hi = partner["ideal_temp"]
+                m_lo, m_hi = partner["tolerable_moisture"]
+                a_lo, a_hi = partner["optimal_elev"]
+                tf = Model.factor_suitability(values["temperature_c"], {"min": t_lo, "max": t_hi}, 5)
+                mf = Model.factor_suitability(values["soil_moisture_m3_m3"], {"min": m_lo, "max": m_hi}, 0.12)
+                af = Model.factor_suitability(actual_altitude_m, {"min": a_lo, "max": a_hi}, 1000)
+                if irrigation and values["soil_moisture_m3_m3"] < m_lo:
+                    mf += (100 - mf) * 0.70
+                fits.append(round(min(0.60 * tf + 0.35 * mf + 0.05 * af, 100 * math.sqrt(min(tf, mf) / 100))))
+            weakest = min(fits) if fits else baseline
+            avg = round(sum(fits) / len(fits)) if fits else baseline
+            radar = strategy["radar_scores"]
+            # Limited agronomic benefit proportional to existing moisture constraints.
+            # Neither altitude nor catastrophic thermal stress is repaired by rotation.
+            moisture_loss = primary["penalties"]["soil_moisture"] + primary["penalties"]["precip"]
+            benefit = min(8, moisture_loss * 0.25 * radar["water_efficiency"] / 100)
+            if strategy.get("is_baseline"):
+                viability = baseline
+                benefit = 0
             else:
-                # Multi-crop rotation is buffered against climate extremes
-                resilience_buffer = 10 if ("Andisol" in actual_soil_type or "Inceptisol" in actual_soil_type) else 6
-                if actual_slope_pct > 15.0 and strat["primary_goal"] == "erosion_control":
-                    resilience_buffer += 6
-
-                # Under climate stress, rotation penalty is much milder than monoculture
-                climate_impact = 0
-                if delta_temp_c > 1.5:
-                    climate_impact += (delta_temp_c - 1.5) * 2.5
-                if delta_precip_pct < -20.0:
-                    climate_impact += abs(delta_precip_pct + 20.0) * 0.18
-                elif delta_precip_pct > 30.0:
-                    climate_impact += (delta_precip_pct - 30.0) * 0.15
-
-                base_combo = (primary_viability * 0.50) + (avg_partner_fit * 0.35) + resilience_buffer
-                viability_score = max(25, min(98, round(base_combo - climate_impact)))
-
-            # 3. Dynamic Farmer Priority Alignment Score
-            radar = dict(strat["radar_scores"])
-            # Adjust radar scores if under climate simulation
-            if delta_precip_pct < -20.0 or delta_temp_c > 1.5:
-                # Water efficiency and soil health become even more critical
-                if not is_base:
-                    radar["water_efficiency"] = min(99, radar["water_efficiency"] + 3)
-                    radar["soil_health"] = min(99, radar["soil_health"] + 2)
-                else:
-                    radar["water_efficiency"] = max(15, radar["water_efficiency"] - 12)
-                    radar["economic_resilience"] = max(20, radar["economic_resilience"] - 10)
-
-            # Weighting according to farmer's selected priority
-            if farmer_priority == "soil_health":
-                weights = {"soil_health": 0.40, "pest_control": 0.20, "water_efficiency": 0.15, "economic_resilience": 0.10, "erosion_control": 0.15}
-            elif farmer_priority == "water_conservation":
-                weights = {"soil_health": 0.15, "pest_control": 0.10, "water_efficiency": 0.45, "economic_resilience": 0.15, "erosion_control": 0.15}
-            elif farmer_priority == "income":
-                weights = {"soil_health": 0.10, "pest_control": 0.15, "water_efficiency": 0.15, "economic_resilience": 0.45, "erosion_control": 0.15}
-            elif farmer_priority == "pest_control":
-                weights = {"soil_health": 0.20, "pest_control": 0.45, "water_efficiency": 0.15, "economic_resilience": 0.10, "erosion_control": 0.10}
-            elif farmer_priority == "erosion_control":
-                weights = {"soil_health": 0.15, "pest_control": 0.10, "water_efficiency": 0.15, "economic_resilience": 0.10, "erosion_control": 0.50}
-            else:  # "balanced"
-                weights = {"soil_health": 0.22, "pest_control": 0.20, "water_efficiency": 0.20, "economic_resilience": 0.20, "erosion_control": 0.18}
-
-            farmer_score = round(sum(radar[k] * w for k, w in weights.items()))
-
-            eval_strat = dict(strat)
-            eval_strat["viability_score"] = viability_score
-            eval_strat["partner_fits"] = partner_fits
-            eval_strat["avg_partner_fit"] = avg_partner_fit
-            eval_strat["farmer_alignment_score"] = farmer_score
-            eval_strat["radar_scores"] = radar
-            evaluated_strategies.append(eval_strat)
-
-        # Identify baseline viability and calculate net advantages
-        baseline_strat = next((s for s in evaluated_strategies if s.get("is_baseline")), evaluated_strategies[0])
-        baseline_score = baseline_strat["viability_score"]
-
-        for s in evaluated_strategies:
-            s["net_advantage_vs_baseline"] = s["viability_score"] - baseline_score
-
-        # Determine the top recommended strategy based on farmer alignment score + viability
-        non_baseline_strategies = [s for s in evaluated_strategies if not s.get("is_baseline")]
-        best_strategy = max(
-            non_baseline_strategies if non_baseline_strategies else evaluated_strategies,
-            key=lambda x: (x["farmer_alignment_score"] * 0.6 + x["viability_score"] * 0.4)
-        )
-
-        for s in evaluated_strategies:
-            s["is_top_recommendation"] = (s["strategy_id"] == best_strategy["strategy_id"])
-
-        # 4. Generate 12-Month Agro-Climatic Vulnerability & Bare-Field Transition Calendar
-        calendar_timeline = cls._generate_vulnerability_calendar(
-            primary_crop=primary_crop,
-            actual_precip_mm=simulated_precip,
-            actual_temp_c=simulated_temp,
-            actual_slope_pct=actual_slope_pct,
-            recommended_strategy=best_strategy,
-        )
-
-        return {
-            "primary_crop": primary_crop,
-            "baseline_viability": baseline_score,
-            "simulated_temp_c": simulated_temp,
-            "simulated_precip_mm": simulated_precip,
-            "simulated_soil_moisture": simulated_sm,
-            "farmer_priority": farmer_priority,
-            "delta_temp_c": delta_temp_c,
-            "delta_precip_pct": delta_precip_pct,
-            "strategies": evaluated_strategies,
-            "recommended_strategy": best_strategy,
-            "vulnerability_calendar": calendar_timeline,
-        }
+                viability = round(min(baseline + benefit,
+                                      0.75 * baseline + 0.25 * weakest + benefit))
+                if baseline < 40:
+                    viability = min(viability, baseline)
+                if weakest < 40:
+                    viability = min(39, viability)
+            viability = max(0, min(100, viability))
+            alignment = round(sum(radar[k] * w for k, w in weights.items()))
+            strategy.update({
+                "viability_score": viability, "partner_fits": fits, "avg_partner_fit": avg,
+                "weakest_partner_fit": weakest, "farmer_alignment_score": alignment,
+                "priority_weights": weights, "net_advantage_vs_baseline": viability - baseline,
+                "management_benefit_points": round(benefit, 1),
+                "ranking_score": round(viability * 0.70 + alignment * 0.30, 2),
+                "eligible": viability >= 60 and weakest >= 40,
+                "system_type": ("Asociación / cobertura entre calles" if primary_crop in
+                                ("Coffee", "Banana", "Avocado") else "Rotación entre ciclos / renovación"),
+                "validation_note": "Confirmar especie, espaciamiento, competencia hídrica, hospedantes de plagas "
+                                   "y duración del ciclo. Los beneficios económicos no son ingresos garantizados.",
+            })
+        eligible = [s for s in strategies if s["eligible"]]
+        pool = eligible or strategies
+        best = max(pool, key=lambda s: (s["ranking_score"], s["viability_score"], s["strategy_id"]))
+        for strategy in strategies:
+            strategy["is_top_recommendation"] = bool(eligible and strategy["strategy_id"] == best["strategy_id"])
+        # Keep baseline first for comparison, alternatives ranked by the selected goal.
+        strategies.sort(key=lambda s: (not s.get("is_baseline", False), not s["eligible"], -s["ranking_score"]))
+        calendar = cls._generate_vulnerability_calendar(
+            primary_crop, values["precipitation_mm"], values["temperature_c"], actual_slope_pct,
+            best, monthly_climate, vegetation_records, delta_temp_c, delta_precip_pct)
+        return {"primary_crop": primary_crop, "baseline_viability": baseline,
+                "simulated_temp_c": values["temperature_c"], "simulated_precip_mm": values["precipitation_mm"],
+                "simulated_soil_moisture": values["soil_moisture_m3_m3"], "farmer_priority": farmer_priority,
+                "delta_temp_c": delta_temp_c, "delta_precip_pct": delta_precip_pct, "strategies": strategies,
+                "recommended_strategy": best, "recommendation_available": bool(eligible),
+                "recommendation_note": "Ninguna estrategia alcanza aptitud moderada; evaluar otro cultivo."
+                    if not eligible else "Prioridad: 70% aptitud y 30% alineación; beneficios sujetos a validación.",
+                "vulnerability_calendar": calendar}
 
     @classmethod
-    def _generate_vulnerability_calendar(
-        cls,
-        primary_crop: str,
-        actual_precip_mm: float,
-        actual_temp_c: float,
-        actual_slope_pct: float,
-        recommended_strategy: Dict[str, Any],
-    ) -> List[Dict[str, Any]]:
-        """
-        Computes 12-month agro-climatic indicators:
-          - Monthly precipitation (mm) and temperature (°C)
-          - Climate Stress Index (0-100)
-          - Monoculture Bare-Soil Vulnerability Index (0-100)
-          - Rotational Vegetative Cover Index (0-100)
-          - Recommended Field Activity / Window
-        """
+    def _generate_vulnerability_calendar(cls, primary_crop, actual_precip_mm, actual_temp_c,
+            actual_slope_pct, recommended_strategy, monthly_climate=None, vegetation_records=None,
+            delta_temp_c=0, delta_precip_pct=0):
+        from src.services.nasa_power import MONTH_KEYS
+        from src.services.seasonal_risk_service import seasonal_indices
         months_es = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Set", "Oct", "Nov", "Dic"]
         months_en = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-
-        # Pacific & Central Valley normalized precipitation distribution curve
-        precip_weights = [0.015, 0.015, 0.025, 0.055, 0.125, 0.120, 0.085, 0.130, 0.165, 0.180, 0.065, 0.020]
-        temp_offsets = [-0.5, 0.3, 0.8, 1.2, 0.4, -0.2, 0.0, -0.1, -0.3, -0.6, -0.7, -0.3]
-
+        climate = monthly_climate or {}
         calendar = []
-        for i in range(12):
-            m_precip = round(actual_precip_mm * precip_weights[i])
-            m_temp = round(actual_temp_c + temp_offsets[i], 1)
-
-            # Climate Stress: high during extreme dry (Jan-Mar) and extreme torrential (Sep-Oct)
-            if m_precip < 50:
-                stress = round(70 + (50 - m_precip) * 0.5)
-                phase_type = "drought_stress"
-            elif m_precip > 350:
-                stress = round(65 + min(30, (m_precip - 350) * 0.15) + (actual_slope_pct * 0.5))
-                phase_type = "excess_runoff"
-            elif 60 <= m_precip <= 110 and i in [6, 7]:  # Veranillo de San Juan
-                stress = 55
-                phase_type = "veranillo_dry_spell"
+        for i, key in enumerate(MONTH_KEYS):
+            p = climate.get("PRECTOT_MONTHLY", {}).get(key)
+            temp = climate.get("T2M", {}).get(key)
+            # No universal Pacific curve imposed on Caribbean sites.
+            known = p is not None and temp is not None
+            if known:
+                p = p * (1 + delta_precip_pct / 100)
+                temp += delta_temp_c
+                dry, wet, _, _ = seasonal_indices(p, temp, None, actual_slope_pct)
+                stress = max(dry, wet)
             else:
-                stress = max(15, round(30 - (m_precip / 50)))
-                phase_type = "optimal_growing"
-            stress = min(98, max(12, stress))
-
-            # Bare Soil Risk in Monoculture: high after harvest in dry/early wet or heavy weeding
-            if i in [0, 1, 2, 3]:  # Jan-Apr (Dry season / post-harvest)
-                bare_soil_mono = 85
-            elif i in [8, 9]:     # Sep-Oct (Heavy rain with bare soil = massive erosion)
-                bare_soil_mono = 65
-            else:
-                bare_soil_mono = 45
-
-            # Rotational Soil Cover: cover crop or mulch shields the soil continuously
-            if i in [0, 1, 2, 3]:
-                rot_cover = 82  # Protected by lignified mulch / living stolons
-            elif i in [4, 5]:
-                rot_cover = 75  # Emergence of sown cover crops
-            elif i in [6, 7]:
-                rot_cover = 90  # Full vegetative canopy during veranillo
-            else:
-                rot_cover = 95  # Dense root mat absorbing intense rains
-
-            # Contextual field action recommendation
-            if i in [3, 4]:
-                action_es = "🌱 Siembra de leguminosas de cobertura con las primeras lluvias"
-                action_en = "🌱 Sowing cover legumes with initial monsoon rains"
-            elif i in [6, 7]:
-                action_es = "✂️ Chapea y distribución de mulch para retener humedad en el Veranillo"
-                action_en = "✂️ Slashing and mulch spreading to retain moisture during midsummer drought"
-            elif i in [8, 9]:
-                action_es = "🛡️ Monitoreo de drenajes y mantenimiento de barreras vivas antierosión"
-                action_en = "🛡️ Drainage ditch monitoring and living barrier erosion maintenance"
-            elif i in [10, 11]:
-                action_es = "🌾 Inicio de cosecha principal y siembra de abonos verdes de entrezafra"
-                action_en = "🌾 Main crop harvest onset and inter-season green manure seeding"
-            else:
-                action_es = "☀️ Acolchado superficial protegiendo el suelo de la radiación directa"
-                action_en = "☀️ Surface mulching shielding topsoil from solar radiation"
-
+                stress = None
+            ndvi = [r["ndvi"] for r in (vegetation_records or []) if int(r["date"][5:7]) == i + 1]
+            bare = round(100 * sum(v < 0.25 for v in ndvi) / len(ndvi)) if ndvi else None
+            dry_phase = known and dry >= 35
+            phase = "unknown" if not known else "drought_stress" if dry_phase else "excess_runoff" if wet >= 35 else "optimal_growing"
+            action_es = ("Mantener mulch y revisar agua; evitar competencia de coberturas vivas." if dry_phase else
+                         "Revisar cobertura y drenajes; acordar siembra según el calendario local.")
             calendar.append({
-                "month_num": i + 1,
-                "month_es": months_es[i],
-                "month_en": months_en[i],
-                "precipitation_mm": m_precip,
-                "temperature_c": m_temp,
-                "climate_stress_index": stress,
-                "bare_soil_monoculture_index": bare_soil_mono,
-                "rotational_cover_index": rot_cover,
-                "phase_type": phase_type,
-                "action_es": action_es,
-                "action_en": action_en,
+                "month_num": i + 1, "month_es": months_es[i], "month_en": months_en[i],
+                "precipitation_mm": round(p, 1) if known else None,
+                "temperature_c": round(temp, 1) if known else None, "climate_stress_index": stress,
+                "bare_soil_monoculture_index": bare,
+                "rotational_cover_index": None,  # Requires measured field cover; no fabricated 95%.
+                "phase_type": phase, "action_es": action_es,
+                "action_en": "Maintain mulch and check water supply." if dry_phase else "Check field cover, drainage and local planting dates.",
             })
-
         return calendar

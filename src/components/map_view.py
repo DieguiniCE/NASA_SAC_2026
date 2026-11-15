@@ -28,12 +28,11 @@ def render_costa_rica_map(
     m = folium.Map(
         location=[selected_lat, selected_lon] if (CR_LAT_MIN <= selected_lat <= CR_LAT_MAX) else COSTA_RICA_CENTER,
         zoom_start=DEFAULT_ZOOM,
-        tiles="CartoDB positron",
+        tiles="OpenStreetMap",
         control_scale=True,
     )
 
     # Add alternative Tile Layers
-    folium.TileLayer("OpenStreetMap", name="OpenStreetMap").add_to(m)
     folium.TileLayer(
         tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
         attr="Esri World Imagery",
@@ -98,7 +97,7 @@ def render_costa_rica_map(
         <p style="margin: 2px 0;"><b>Lon:</b> {selected_lon:.4f}°</p>
         <p style="margin: 2px 0;"><b>Elevación:</b> {elev_text}</p>
         <p style="margin: 4px 0 0 0; color: #2E7D32; font-size: 11px; font-weight: bold;">
-            ✓ Terreno Agrícola Válido (NASA · IMN)
+            Punto terrestre seleccionado; aptitud por evaluar
         </p>
     </div>
     """
@@ -108,6 +107,10 @@ def render_costa_rica_map(
         tooltip=f"Punto activo: {location_name} ({selected_lat:.3f}, {selected_lon:.3f})",
         icon=folium.Icon(color="red", icon="leaf", prefix="fa"),
     ).add_to(m)
+
+    from src.services.thematic_layers import add_thematic_layers
+    add_thematic_layers(m)
+    st.caption('Capas de suelos y riesgos: estimaciones regionales; activar en el control del mapa. Verde: bajo, amarillo: medio, rojo: alto. No representan mediciones prediales.')
 
     folium.LayerControl(position="topright").add_to(m)
 

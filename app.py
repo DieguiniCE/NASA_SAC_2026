@@ -46,6 +46,7 @@ from src.components.charts import (
     create_rotation_gauge,
 )
 from src.i18n import t, lang
+from src.components.risk_panel import render_risk_panel
 
 
 # ─── Page Config ──────────────────────────────────────────────────────────────
@@ -419,6 +420,14 @@ def render_crop_card(res: Dict[str, Any], dark_mode: bool = False):
     </div>
     """, unsafe_allow_html=True)
 
+    if res.get("scenario_active"):
+        st.caption(f"Actual: {res['baseline_percentage']}% → Escenario: {pct}% "
+                   f"({pct - res['baseline_percentage']:+d} pp)")
+    uncertainty = res.get("uncertainty")
+    if uncertainty:
+        st.caption(f"Rango de sensibilidad: {uncertainty['lower']}–{uncertainty['upper']}% · "
+                   f"Confianza de datos: {uncertainty['confidence']}. No es un intervalo estadístico.")
+
 
 # ─── Main Application ─────────────────────────────────────────────────────────
 def main():
@@ -446,14 +455,21 @@ def main():
     actual_soil= env["soil"]["order"]
     actual_slope = float(env["topography_and_erosion"].get("slope_percent", 8.0))
 
-    # Viability results for all 5 crops
-    all_results: List[Dict[str, Any]] = SensitivityViabilityModel.calculate_all_crops(
-        actual_temp_c=actual_t,
-        actual_precip_mm=actual_p,
-        actual_altitude_m=actual_alt,
-        actual_soil_moisture_m3_m3=actual_sm,
-        actual_soil_type=actual_soil,
-    )
+    sim_delta_t = st.session_state.get("scenario_temp", 0.0)
+    sim_delta_p = st.session_state.get("scenario_precip", 0)
+    irrigation = st.session_state.get("farm_irrigation", False)
+    shade_mode = st.session_state.get("farm_shade_mode", "Sin sombra")
+    shade = shade_mode == "SAF confirmado" or (
+        shade_mode.startswith("Automática") and env["vegetation"]["canopy"]["canopy_detected"])
+    model_options = dict(irrigation=irrigation, shade=shade, data_quality=env["data_quality"])
+    baseline_results = SensitivityViabilityModel.calculate_all_crops(
+        actual_t, actual_p, actual_alt, actual_sm, actual_soil, **model_options)
+    all_results = SensitivityViabilityModel.calculate_all_crops(
+        actual_t, actual_p, actual_alt, actual_sm, actual_soil,
+        delta_temp_c=sim_delta_t, delta_precip_pct=sim_delta_p, **model_options)
+    for res, base in zip(all_results, baseline_results):
+        res["baseline_percentage"] = base["success_percentage"]
+        res["scenario_active"] = bool(sim_delta_t or sim_delta_p)
 
     # ── App Header ──────────────────────────────────────────────────────────
     tooltip_fusion = render_term("Satellite vs. Ground Data", "Fusión Satelital + Tierra (IMN)" if current_lang == "es" else "Satellite + Ground Fusion (IMN)")
@@ -479,6 +495,20 @@ def main():
         <i>{t('tooltip_hint')}</i>
     </div>
     """, unsafe_allow_html=True)
+
+    st.caption("Viabilidad = índice orientativo de aptitud 0–100. Pesos: temperatura 45%, lluvia 30%, "
+               "humedad 20%, altitud 5%. No es probabilidad de cosecha.")
+    with st.expander("Procedencia y calidad de datos"):
+        st.json(env["provenance"])
+        st.caption("La pendiente, humedad y suelo son estimaciones; confirmar en finca.")
+    if env["provenance"]["climate_is_simulated"]:
+        st.warning("NASA POWER no disponible o incompleto: se usa un modelo regional, con confianza baja.")
+    if st.session_state.get("farm_mechanization") == "Tractor" and actual_slope > 15:
+        st.warning(f"Pendiente estimada {actual_slope:.1f}% > 15%: evaluar seguridad y aptitud de mecanización en finca.")
+    if shade_mode.startswith("Automática") and shade:
+        st.info("GEDI sugiere dosel cercano. La reducción térmica se aplica como escenario; confirmar sombra sobre el cafetal.")
+    if active_page in (PAGE_ANALYZE, PAGE_ROTATION, PAGE_SCIENCE):
+        render_risk_panel(env, sim_delta_t, sim_delta_p)
 
     # ===========================================================================
     #  PAGE 1 — Analizar Ubicación / Analyze Location
@@ -598,34 +628,18 @@ def main():
         title_crops = "🌾 Fichas de Cultivo & Algoritmo de Sensibilidad (GEMINI.md)" if current_lang == "es" else "🌾 Crop Profiles & Sensitivity Algorithm (GEMINI.md)"
         st.markdown(f"<div class='section-title'>{title_crops}</div>", unsafe_allow_html=True)
 
-        # Algorithm explanation panel
         with st.expander(t("how_it_works"), expanded=False):
-            if current_lang == "es":
-                st.markdown("""
-**El modelo de viabilidad implementa directamente el Project Blueprint (GEMINI.md):**
-
-| Paso | Descripción | Fórmula |
-|------|-------------|---------|
-| **1. Ficha del Cultivo** | Parámetros ideales: rango `[min, max]` y `sweet_spot` óptimo | — |
-| **2. Sensitivity Score** | Rango estrecho → Alta Sensibilidad | $S_{temp} = \\dfrac{k}{T_{max} - T_{min}}$ |
-| **3. Delta** | Desviación del dato real respecto al sweet spot | $\\Delta = | \\text{Actual} - \\text{Sweet Spot} |$ |
-| **4. Éxito** | Base 100 menos penalidad amplificada por sensibilidad | $\\text{Éxito} = 100 - \\sum (\\Delta_i \\times S_i \\times w_i)$ |
-
-**Pesos del modelo compuesto:** Temperatura 35% · Precipitación 30% · Humedad del Suelo 20% · Altitud 15%
-                """)
-            else:
-                st.markdown("""
-**The viability model directly implements the Project Blueprint (GEMINI.md):**
-
-| Step | Description | Formula |
-|------|-------------|---------|
-| **1. Crop Profile** | Ideal parameters: range `[min, max]` and optimal `sweet_spot` | — |
-| **2. Sensitivity Score** | Narrow range → High Sensitivity | $S_{temp} = \\dfrac{k}{T_{max} - T_{min}}$ |
-| **3. Delta** | Deviation of actual observation from sweet spot | $\\Delta = | \\text{Actual} - \\text{Sweet Spot} |$ |
-| **4. Success Score** | 100 baseline minus penalty amplified by sensitivity | $\\text{Success} = 100 - \\sum (\\Delta_i \\times S_i \\times w_i)$ |
-
-**Composite Model Weights:** Temperature 35% · Precipitation 30% · Soil Moisture 20% · Altitude 15%
-                """)
+            st.markdown(
+                "**Modelo v2:** aptitud constante dentro del rango ideal y descenso gradual fuera de él. "
+                "Pesos: temperatura 45%, lluvia 30%, humedad 20%, altitud 5%. "
+                "El factor crítico limita el resultado; el suelo no compatible resta hasta 3 puntos. "
+                "S=k/rango describe sensibilidad, pero no vuelve a multiplicar las penalizaciones."
+                if current_lang == "es" else
+                "**Model v2:** full suitability inside ideal ranges, smooth decay outside. "
+                "Weights: temperature 45%, rainfall 30%, moisture 20%, elevation 5%. "
+                "A critical factor caps the result; soil mismatch subtracts up to 3 points. "
+                "S=k/range describes sensitivity and does not multiply penalties again."
+            )
 
         # Crop selector
         crop_names = [f"{c['icon']} {c['crop']} / {c.get('common_name_es', c['crop'])}" for c in CROPS_LIST]
@@ -764,6 +778,8 @@ def main():
             ])
             st.dataframe(df, use_container_width=True, hide_index=True)
 
+            st.caption(f"Límite por factor crítico: {crop_res['limiting_cap']:.1f}/100. "
+                       f"Reducción adicional: {crop_res['limiting_penalty']:.1f} puntos.")
             # Gauge chart
             st.plotly_chart(
                 create_viability_gauge(pct, crop_res["crop"], crop_res["icon"], dark_mode=dark_mode),
@@ -851,29 +867,8 @@ def main():
         </div>
         """, unsafe_allow_html=True)
 
-        # ── Climate Scenario Simulator (What-If Sliders) ───────────────────────
-        with st.expander(t("simulation_title"), expanded=False):
-            st.markdown(
-                ("💡 **Simulación de Resiliencia Climática:** Ajuste los controles para evaluar el comportamiento "
-                 "de las estrategias ante eventos de estrés (ej. sequías por El Niño, canículas prolongadas o excesos pluviales).")
-                if current_lang == "es" else
-                ("💡 **Climate Resilience Simulation:** Adjust controls to evaluate strategy performance under "
-                 "stress events (e.g., El Niño droughts, heatwaves, or extreme cloudbursts).")
-            )
-            sim_col1, sim_col2 = st.columns(2)
-            with sim_col1:
-                sim_delta_t = st.slider(
-                    "🌡️ " + ("Variación de Temperatura (ΔT °C):" if current_lang == "es" else "Temperature Variation (ΔT °C):"),
-                    min_value=-2.0, max_value=4.0, value=0.0, step=0.5,
-                    format="%+.1f °C"
-                )
-            with sim_col2:
-                sim_delta_p = st.slider(
-                    "🌧️ " + ("Variación de Precipitación (ΔP %):" if current_lang == "es" else "Precipitation Variation (ΔP %):"),
-                    min_value=-50, max_value=50, value=0, step=5,
-                    format="%+d%%"
-                )
-
+        st.caption(f"Escenario compartido: ΔT {sim_delta_t:+.1f} °C · ΔP {sim_delta_p:+.0f}%. "
+                   "Aptitud y alineación son índices, no probabilidades ni beneficios económicos.")
         # ── Evaluate Multi-Strategy Rotation Engine ───────────────────────────
         primary_result = next(r for r in all_results if r["crop"] == selected_primary)
         primary_viability = primary_result["success_percentage"]
@@ -890,8 +885,16 @@ def main():
             farmer_priority=farmer_priority,
             delta_temp_c=sim_delta_t,
             delta_precip_pct=sim_delta_p,
+            irrigation=irrigation, shade=shade,
+            monthly_climate=env["raw_services"]["nasa_power"]["parameters"],
+            vegetation_records=env["vegetation"]["ndvi"]["records"],
         )
 
+        st.caption(rot_analysis["recommendation_note"])
+        if not rot_analysis["recommendation_available"]:
+            st.warning("No hay una estrategia recomendable con estas condiciones. Las opciones se muestran para comparación.")
+        st.caption("Café, banano y aguacate: asociaciones/coberturas entre calles; no sustitución anual del cultivo perenne. "
+                   "Yuca requiere un ciclo más largo que maíz; verificar ventana de cosecha y mercado.")
         evaluated_strats = rot_analysis["strategies"]
         rec_strat = rot_analysis["recommended_strategy"]
         calendar_timeline = rot_analysis["vulnerability_calendar"]
@@ -917,7 +920,7 @@ def main():
                 border_style = f"1px solid {border_card}"
                 card_bg = bg_card
             else:
-                badge_html = f"<span style='background:#1565C0; color:white !important; font-size:10px; font-weight:800; padding:2px 7px; border-radius:10px;'>{'ALTERNATIVA VIABLE' if current_lang == 'es' else 'VIABLE OPTION'}</span>"
+                badge_html = f"<span style='background:#1565C0; color:white !important; font-size:10px; font-weight:800; padding:2px 7px; border-radius:10px;'>{('ALTERNATIVA APTA' if c_strat['eligible'] else 'APTITUD INSUFICIENTE') if current_lang == 'es' else ('SUITABLE OPTION' if c_strat['eligible'] else 'LOW SUITABILITY')}</span>"
                 border_style = f"1px solid {border_card}"
                 card_bg = bg_card
 
@@ -926,7 +929,7 @@ def main():
             strat_concept = c_strat.get("concept_es" if current_lang == "es" else "concept_en", "")
             concept_preview = (strat_concept[:105] + "…") if len(strat_concept) > 105 else strat_concept
             net_vs_base = c_strat["net_advantage_vs_baseline"]
-            net_txt = f"+{net_vs_base}%" if net_vs_base > 0 else f"{net_vs_base}%"
+            net_txt = f"{net_vs_base:+d} pp"
             net_color = "#2E7D32" if net_vs_base > 0 else ("#757575" if net_vs_base == 0 else "#D32F2F")
 
             with col:
@@ -1087,48 +1090,20 @@ def main():
         # ── 12-Month Agro-Climatic Vulnerability & Bare-Field Transition Calendar ──
         st.markdown(f"<div class='section-title'>{t('timeline_title')}</div>", unsafe_allow_html=True)
         st.caption(
-            "Visualiza la correlación entre las precipitaciones satelitales (GPM), el estrés térmico/hídrico, "
-            "los períodos de suelo desnudo en monocultivo y la protección continua que brinda la cobertura viva rotacional."
+            "Lluvia y estrés según el patrón local. La serie de suelo expuesto requiere NDVI válido; "
+            "los huecos indican ausencia de observación. El calendario de siembra se valida en finca."
             if current_lang == "es" else
-            "Visualizes the correlation between satellite rainfall (GPM), climate stress, bare-soil vulnerability "
-            "under monoculture, and the continuous living armor provided by rotational covers."
+            "Rainfall and stress follow the local pattern. Exposed-soil data require valid NDVI; "
+            "gaps indicate missing observations. Validate planting dates on the farm."
         )
-
         st.plotly_chart(
             create_vulnerability_timeline_chart(calendar_timeline, dark_mode=dark_mode, lang=current_lang),
-            use_container_width=True
+            use_container_width=True,
         )
-
-        # Contextual Interpretation of Seasonal Windows
-        c_win1, c_win2, c_win3 = st.columns(3)
-        with c_win1:
-            st.markdown(f"""
-            <div class="rotation-card" style="border-top: 3px solid #E65100; height:100%;">
-                <b style="color:#E65100;">☀️ {'Períodos de Suelo Desnudo' if current_lang == 'es' else 'Bare-Soil Vulnerability'}</b>
-                <p style="font-size:12px; margin-top:6px; color:{txt_col};">
-                {'En monocultivos, los meses secos (Ene-Abr) y post-cosecha dejan el terreno sin cobertura. La radiación directa degrada la materia orgánica y el viento acelera la erosión.' if current_lang == 'es' else 'Under monoculture, dry months (Jan-Apr) leave ground completely bare. Solar radiation oxidizes organic matter and trade winds accelerate erosion.'}
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
-        with c_win2:
-            st.markdown(f"""
-            <div class="rotation-card" style="border-top: 3px solid #2E7D32; height:100%;">
-                <b style="color:#2E7D32;">🌱 {'Ventana Óptima de Siembra' if current_lang == 'es' else 'Optimal Sowing Window'}</b>
-                <p style="font-size:12px; margin-top:6px; color:{txt_col};">
-                {'Con la entrada de las lluvias en mayo (registradas por GPM), la siembra inmediata de leguminosas (Canavalia, Caupí) asegura rápida germinación y fijación simbiótica de nitrógeno.' if current_lang == 'es' else 'With monsoon onset in May (tracked by GPM), immediate legume sowing ensures rapid establishment and symbiotic biological nitrogen fixation.'}
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
-        with c_win3:
-            st.markdown(f"""
-            <div class="rotation-card" style="border-top: 3px solid #1565C0; height:100%;">
-                <b style="color:#1565C0;">✂️ {'Acolchado & Veranillo' if current_lang == 'es' else 'Mulch & Dry Spell Buffering'}</b>
-                <p style="font-size:12px; margin-top:6px; color:{txt_col};">
-                {'Segar la cobertura viva en julio antes del Veranillo de San Juan crea un colchón de mulch que reduce la evapotranspiración (ECOSTRESS) y mantiene la humedad radicular (SMAP).' if current_lang == 'es' else 'Slashing living cover in July prior to the midsummer drought forms a thick mulch that curbs evapotranspiration (ECOSTRESS) and preserves root moisture (SMAP).'}
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
-
+        st.dataframe(pd.DataFrame([{
+            "Mes / Month": row["month_es"] if current_lang == "es" else row["month_en"],
+            "Acción / Action": row["action_es"] if current_lang == "es" else row["action_en"],
+        } for row in calendar_timeline]), hide_index=True, use_container_width=True)
         st.markdown("---")
 
         # ── Cross-crop rotation comparison matrix ──────────────────────────
@@ -1149,14 +1124,19 @@ def main():
                 farmer_priority=farmer_priority,
                 delta_temp_c=sim_delta_t,
                 delta_precip_pct=sim_delta_p,
+                irrigation=irrigation, shade=shade,
+                monthly_climate=env["raw_services"]["nasa_power"]["parameters"],
+                vegetation_records=env["vegetation"]["ndvi"]["records"],
             )
             top_strat = c_analysis["recommended_strategy"]
             rot_summary.append({
                 t("crop_label"): f"{c['icon']} {c_name}",
                 "Viabilidad Monocultivo" if current_lang == "es" else "Monoculture Viability": f"{c_analysis['baseline_viability']}%",
                 "Viabilidad con Rotación" if current_lang == "es" else "Rotation Viability": f"{top_strat['viability_score']}%",
-                "Ventaja Neta" if current_lang == "es" else "Net Advantage": f"+{top_strat['net_advantage_vs_baseline']}%" if top_strat['net_advantage_vs_baseline'] > 0 else f"{top_strat['net_advantage_vs_baseline']}%",
-                "Estrategia Recomendada" if current_lang == "es" else "Recommended Strategy": top_strat["name_es"].split(":")[1].strip() if current_lang == "es" else top_strat["name_en"].split(":")[1].strip(),
+                "Ventaja Neta" if current_lang == "es" else "Net Advantage": f"{top_strat['net_advantage_vs_baseline']:+d} pp",
+                "Estrategia Recomendada" if current_lang == "es" else "Recommended Strategy": (
+                    top_strat["name_es" if current_lang == "es" else "name_en"]
+                    if c_analysis["recommendation_available"] else "Ninguna / None"),
                 "Alineación con Meta" if current_lang == "es" else "Farmer Goal Alignment": f"{top_strat['farmer_alignment_score']}%",
             })
         st.dataframe(pd.DataFrame(rot_summary), use_container_width=True, hide_index=True)

@@ -1,137 +1,143 @@
-# 🛰️ AgroClima Costa Rica | NASA Space Apps Challenge 2026
+# AgroClima Costa Rica
 
-**AgroClima CR** es una plataforma agroambiental y bioclimática desarrollada en **Python** y **Streamlit** diseñada para analizar la viabilidad del cultivo en cualquier punto geográfico de Costa Rica, integrando datos satelitales globales de observación de la Tierra provistos por la **NASA** e información climática y edafológica del **Instituto Meteorológico Nacional (IMN)** y el **Ministerio de Agricultura y Ganadería (MAG)**.
+Aplicación Streamlit y API FastAPI para comparar aptitud de cultivos, asociaciones
+y rotaciones, con escenarios climáticos y alertas estacionales.
 
----
+## Ejecutar
 
-## 🛰️ Bases de Datos y Misiones Satelitales Integradas
-
-La aplicación conecta e implementa las siguientes fuentes de datos para evaluar las variables requeridas:
-
-| Base de Datos / Misión | Producto / Instrucción | Variable Agroambiental Extraída | Resolución |
-| :--- | :--- | :--- | :--- |
-| **NASA SMAP** *(Soil Moisture Active Passive)* | **`L2_SM_A/P`** (`SPL2SMAP` / `SPL2SMP`) | **Humedad del Suelo Superficial** (0–5 cm, $m^3/m^3$) | 9 km / 33 km |
-| **NASA SMAP** | **`L4_SM`** (`SPL4SMGP`) | **Humedad en Zona Radicular** (0–100 cm, $m^3/m^3$) y **Temperatura del Suelo** (`soil_temp_layer1` a 5 cm) | 9 km EASE-Grid |
-| **NASA GPM** *(Global Precipitation Measurement)* | **`GPM DPR Monthly`** (`3DPR` / IMERG Monthly) | **Precipitación Mensual por Radar** (Bandas Ka/Ku), picos de tormenta y factor de erosividad pluvial ($R$) | 0.1° (~10 km) |
-| **NASA ECOSTRESS / VIIRS** | **`ECO_L4T_ESI`** & **`ECO2LSTE`** | **Índice de Estrés Evaporativo (ESI)** ($ET/PET$), humedad cuadriculada a 70m y **Temperatura Superficial Terrestre (LST / Ground Temp)** | 70 metros |
-| **NASA SRTM** *(Shuttle Radar Topography Mission)* | **`SRTMGL1`** (Global DEM) | **Elevación Topográfica Exacta** ($msnm$), **Pendiente del Terreno** (% y grados) y factor topográfico $LS$ | 30 metros (1 arc-sec) |
-| **IMN / MAG Costa Rica** | Cartografía CIA-UCR / IMN | **Órdenes de Suelo** (Andisol, Ultisol, Inceptisol, Alfisol, Vertisol, Entisol), textura, pH y **Potencial de Absorción e Infiltración** ($mm/h$) | Regionalizada CR |
-| **IMN Costa Rica** | Escenarios Regionalizados 2030 / 2050 | **Proyecciones de Cambio Climático** ($\Delta T$, $\Delta P$, variación estacional) para las 6 regiones del país | 6 subregiones CR |
-| **NASA POWER** | Agroclimatología (`community=AG`) | **Temperatura del Aire** (Media, Mín, Máx), Humedad Relativa (`RH2M`), Radiación Solar (`ALLSKY_SFC_SW_DWN`) y Viento | 0.5° global |
-
----
-
-## 📊 Parámetros Clave Analizados
-
-1. **🌡️ Temperatura del Aire y del Suelo:**
-   - Temperatura del aire a 2 metros (`T2M`, Mín, Máx) provista por NASA POWER / IMN.
-   - Temperatura de la superficie del suelo provista por **NASA ECOSTRESS (LST)** y **NASA SMAP (L4_SM `soil_temp_layer1`)**.
-2. **🛡️ Riesgo de Erosión Hídrica:**
-   - Calculado mediante el modelo paramétrico **RUSLE** ($A = R \times K \times LS \times C \times P$), combinando la erosividad de lluvia $R$ de **GPM DPR**, la erodabilidad $K$ del suelo **IMN**, y la longitud/gradiente de pendiente $LS$ de **SRTM 30m**.
-3. **🪨 Tipo y Orden de Suelo:**
-   - Clasificación de órdenes según *Soil Taxonomy* en Costa Rica (Andisoles, Ultisoles, Inceptisoles, Alfisoles, Vertisoles, Entisoles) con sus propiedades físicas, químicas y de drenaje.
-4. **⛰️ Elevación Topográfica:**
-   - Elevación y relieve provistos por **NASA SRTM 30m**, junto con clasificación de aptitud para mecanización agrícola.
-5. **🌧️ Precipitación (Histórica y Proyecciones):**
-   - Serie histórica mensual de radar **GPM DPR** y NASA POWER.
-   - Escenarios regionalizados de cambio climático del **IMN para 2030 y 2050** ($\Delta T$, $\Delta P$).
-6. **💧 Humedad (Aire y Potencial de Absorción del Suelo):**
-   - Humedad relativa atmosférica (`RH2M`).
-   - Humedad superficial (0–5 cm) con **SMAP L2_SM_A/P**.
-   - Humedad radicular activa (0–100 cm) con **SMAP L4_SM**.
-   - **Potencial de absorción e infiltración hidráulica** ($mm/h$) y capacidad de retención de agua ($AWC$, $mm/m$) según el orden de suelo del IMN/MAG.
-
----
-
-## 🌱 Modelo Básico de Viabilidad (Baseline Engine)
-
-Como se solicitó, se implementó un **modelo básico inicial** multivariable para evaluar la viabilidad de siembra sin entrar aún en el entrenamiento de redes neuronales o simulaciones complejas:
-- **Componente Térmico (25%):** Concordancia de T° de aire y suelo con el rango óptimo del cultivo.
-- **Componente Hídrico (25%):** Régimen pluvial (GPM) y disponibilidad hídrica en raíces (SMAP L4).
-- **Componente Edafológico (20%):** Afinidad con el orden de suelo (IMN) y drenaje/absorción.
-- **Componente Topográfico (15%):** Piso altitudinal (SRTM) y penalización por riesgo de erosión en pendiente.
-- **Componente de Resiliencia Climática (15%):** Vulnerabilidad ante el escenario IMN 2050.
-
-> [!NOTE]
-> Este modelo es un baseline modular diseñado para ser ajustado, calibrado o reemplazado por modelos de Machine Learning (ej. Random Forest, XGBoost) o modelos agroecológicos (DSSAT, APSIM) en etapas posteriores.
-
----
-
-## 📂 Arquitectura de Archivos
-
-```
-NASA_SAC_2026/
-├── app.py                           # Punto de entrada Streamlit (Vistas multibase y menús)
-├── requirements.txt                 # Dependencias fijadas (Streamlit, Folium, Plotly, etc.)
-├── README.md                        # Documentación del sistema
-└── src/
-    ├── config.py                    # Constantes, límites geográficos y parámetros NASA
-    ├── services/
-    │   ├── data_lake.py             # Agregador y motor de fusión satelital + IMN
-    │   ├── smap_service.py          # NASA SMAP (L2_SM_A/P y L4_SM)
-    │   ├── gpm_service.py           # NASA GPM DPR Monthly & Erosividad R
-    │   ├── ecostress_service.py     # NASA ECOSTRESS / VIIRS (ESI & LST)
-    │   ├── srtm_service.py          # NASA SRTM 30m DEM & Pendiente
-    │   ├── imn_cr_service.py        # IMN Suelos, Absorción, Erosión RUSLE y Proyecciones 2050
-    │   └── nasa_power.py            # NASA POWER Agroclimatology (AG)
-    ├── models/
-    │   └── basic_viability.py       # Modelo básico de aptitud de cultivo multivariable
-    ├── components/
-    │   ├── map_view.py              # Mapa interactivo de Costa Rica (Folium)
-    │   ├── sidebar.py               # Menús de navegación y selector de ubicación
-    │   ├── metrics_display.py       # Tarjetas de indicadores ambientales
-    │   └── charts.py                # Gráficos Walter-Lieth, radar de aptitud y termometría
-    └── data/
-        ├── costa_rica_locations.py  # Directorio de cantones y zonas agropecuarias de CR
-        └── crops_catalog.py         # Requerimientos biofísicos de cultivos tropicales
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m streamlit run app.py
+# API opcional:
+.\.venv\Scripts\python.exe -m uvicorn src.api:app --reload
 ```
 
----
+## Modelo de aptitud v2
 
-## 🔄 Motor de Rotación de Cultivos & Diversificación Agroecológica
+- Temperatura **45%**, lluvia anual **30%**, humedad radicular **20%**, altitud **5%**.
+- Cada factor tiene aptitud 100 dentro del rango ideal y descenso continuo fuera.
+  La distancia al punto óptimo se muestra como referencia, sin penalizar condiciones
+  que siguen dentro del rango ideal. Los rangos originales del catálogo se conservan.
+- Temperatura usa los límites tolerables del catálogo: en esos límites el factor
+  térmico vale aproximadamente 25/100. Los demás anchos de respuesta son supuestos
+  explícitos: lluvia 60% del límite (mínimos 400/800 mm), humedad 0.12/0.15 m³/m³,
+  altitud 1000 m. La piña usa límites de desarrollo de lluvia de 600–4000 mm
+  reportados en [Agronomía Mesoamericana](https://archivo.revistas.ucr.ac.cr/index.php/agromeso/article/download/48171/50585?inline=1),
+  diferenciados del óptimo y condicionados al drenaje. Deben calibrarse con rendimientos y variedades locales.
+- Puntaje ponderado = 100 menos las penalizaciones de los factores y hasta 3 puntos
+  por suelo no compatible. Un factor crítico impone un límite adicional:
+  `100 * sqrt(min(temperatura, lluvia, humedad) / 100)`.
+  Así, buenas condiciones secundarias no ocultan un déficit o estrés térmico extremo.
+- La altitud tiene poco peso porque también influye sobre la temperatura. El índice
+  descriptivo `S=k/rango` ya no multiplica nuevamente las penalizaciones.
+- Alta >=80, moderada >=60, marginal >=40, insuficiente <40.
+- **Es un índice heurístico de aptitud, no una probabilidad de cosecha, un rendimiento
+  ni una predicción de rentabilidad.** No está validado con una muestra de cosechas.
 
-Cumpliendo con los **Objetivos del NASA Space Apps Challenge 2026**, la plataforma incorpora un módulo avanzado de exploración y comparación de estrategias rotacionales para los 5 cultivos clave de Costa Rica (Café, Banano, Caña de Azúcar, Piña y Aguacate):
+El rango de incertidumbre explora ocho combinaciones de perturbaciones de
+temperatura, lluvia y humedad; incluye el puntaje central. Para entradas estimadas
+usa ±2 °C, ±20% de lluvia y ±0.08 m³/m³; para datos observados, ±1 °C, ±10% y ±0.04.
+Se muestra como **rango de sensibilidad**, no como intervalo estadístico de confianza.
+No se inventa un margen fijo de ±5%. La mezcla actual de fuentes mantiene confianza baja.
 
-1. **Comparación de al menos tres estrategias rotacionales:**
-   - **Estrategia 0 (Línea Base / Monocultivo Tradicional):** Práctica continua convencional.
-   - **Estrategia 1 (Agroecológica & Fijación de Nitrógeno):** Regeneración biológica con leguminosas (*Canavalia*, *Mucuna*, *Phaseolus*) y biofumigación con *Crotalaria juncea*.
-   - **Estrategia 2 (Diversificación Comercial & Renta Extra):** Intercalado y rotación con cultivos de mercado y seguridad alimentaria (*Maíz criollo*, *Yuca de exportación*, *Camote*).
-   - **Estrategia 3 (Resiliencia Climática & Conservación Hídrica):** Manto vivo perenne (*Arachis pintoi* - Maní forrajero), barreras vivas de *Vetiver* y pastos profundos (*Brachiaria*).
+## Funcionalidades
 
-2. **Los 5 Pilares de Análisis Requeridos por NASA:**
-   - 💡 **Por qué se sugiere / Rationale:** Justificación agroecológica según el clima y suelo local.
-   - 🛰️ **Evidencia Satelital & Terrestre:** Indicadores concretos de **NASA SMAP** (humedad radicular), **ECOSTRESS** (índice de estrés evaporativo ESI y temperatura superficial LST), **GPM DPR** (precipitación y erosividad), **SRTM** (pendiente topográfica) y suelos **IMN**.
-   - 🌟 **Beneficios Ofrecidos:** Fijación de nitrógeno (+40 a +70 kg N/ha), reducción de erosión (>80%), corte de nemátodos y hongos fitopatógenos, e ingresos complementarios.
-   - 🔍 **Vacíos de Información & Incertidumbre:** Transparencia científica sobre nubosidad óptica, variabilidad microclimática y acceso local a semillas.
-   - ⚠️ **Riesgos y Revisión del Productor:** Aspectos agronómicos que requieren el criterio in-situ del agricultor (mano de obra, deshierbe, drenaje).
+1. Controles globales ΔT de −2 a +4 °C y ΔP de −40 a +40%; comparación actual/escenario
+   en tarjetas, con el mismo escenario en rotaciones y alertas.
+2. Riego suplementario: reduce hasta 70% de las penalizaciones por déficit, nunca por
+   exceso. Sombra de café: escenario de hasta −1.5 °C si está por encima del ideal.
+   Aviso de tractor cuando la pendiente estimada supera 15%.
+3. Vigilancia de frío con mínimas climatológicas: >8 °C bajo; (4,8] vigilancia;
+   <=4 alerta alta. **No confirma heladas ni inversiones nocturnas.**
+   El gradiente 0.006 °C/m solo se usa si se indica una elevación de referencia distinta.
+4. Rotaciones ordenadas por objetivo: agua, suelo/N, plagas, ingresos y erosión.
+   Viabilidad y alineación se mantienen separadas. El orden combina 70% aptitud y
+   30% meta, con filtro de viabilidad. Sin mínimos forzados ni elección obligatoria
+   de una rotación: también puede ganar la línea base o no haber opción recomendable.
+   Ventaja neta = diferencia respecto a la línea base **en puntos porcentuales**.
+   Café, banano y aguacate se tratan como asociaciones entre calles, no rotación anual.
+5. Panel de validaciones obligatorias: laboratorio de suelo, drenaje, compactación,
+   humedad, variedad y pendiente.
+6. Serie mensual NDVI MODIS con filtro de calidad. NDVI <0.25 dispara vigilancia
+   de suelo expuesto y eleva el factor C de cobertura de la aproximación RUSLE.
+   NDVI negativo puede indicar agua; no confirma suelo desnudo.
+7. Capas Folium activables: suelos, erosión hídrica y déficit hídrico.
+   Las capas incluidas son **estimaciones regionales**, no cartografía oficial.
+8. Conector GEDI RH98/AGBD con filtros de calidad y estado sin cobertura.
+   La detección de dosel puede activar el escenario de sombra de café si el usuario
+   elige el modo automático. Un dosel cercano no demuestra sombra sobre el cultivo.
 
-3. **Alineación con Prioridades del Productor:**
-   - Filtros de prioridad interactivos: *Enfoque Equilibrado*, *Regenerar Suelo & N*, *Ahorro Hídrico*, *Ingresos Extra*, *Control de Plagas*, *Control de Erosión*.
+Las alertas cubren los **seis meses siguientes**, con fechas de Costa Rica. Usan
+los últimos cinco años completos de NASA POWER y, si faltan, su climatología mensual.
+Incluyen sequía, erosión hídrica y eólica, acciones sugeridas, período y número de años.
+Los índices son de cribado; no pronostican tormentas, pérdidas de suelo ni probabilidades.
+La frecuencia histórica solo se calcula con al menos tres años válidos por mes.
+Si falta viento, el riesgo eólico es desconocido. Si falta NDVI se informa el supuesto C=0.5.
 
-4. **Calendario Agroclimático de 12 Meses & Transiciones de Suelo Desnudo:**
-   - Visualización mes a mes de las precipitaciones GPM, el índice de estrés climático, los períodos críticos de suelo descubierto (bare soil) en monocultivo y la protección continua de la cobertura viva rotacional.
+## Procedencia real
 
-5. **Simulador de Escenarios Climáticos (What-If Analysis):**
-   - Sliders de variación de temperatura ($\Delta T$) y lluvia ($\Delta P$) que demuestran en tiempo real la estabilidad y resiliencia de los sistemas rotacionales frente a sequías (El Niño) o temporales extremos.
+NASA POWER consulta climatología y series mensuales MERRA-2. Se validan valores
+faltantes, límites físicos, unidades de precipitación y años bisiestos.
+Una respuesta incompleta activa un modelo regional explícitamente identificado;
+los faltantes no se convierten en cero lluvia.
 
-6. **Herramienta de Apoyo Centrada en el Agricultor:**
-   - Recordatorio ético de que el sistema apoya y empodera el conocimiento tradicional y la toma de decisiones, sin reemplazar el juicio del agricultor ni la asesoría de extensionistas locales (MAG/INTA/ICAFE/CORBANA/LAICA).
+Los servicios heredados llamados SMAP, GPM, ECOSTRESS, SRTM e IMN **no descargan
+actualmente todos esos productos**: humedad, temperatura de suelo, pendiente,
+clasificación edáfica y escenarios regionales usan estimaciones o tablas locales.
+La lluvia del perfil se deriva de POWER. La elevación de localidad cercana no es
+un DEM predial. La interfaz y API incluyen procedencia para evitar confundirlas
+con mediciones. Las pérdidas RUSLE heredadas son aproximaciones no calibradas.
 
----
+## Activar MODIS / GEDI
 
-## 🚀 Instrucciones de Ejecución
+Requiere una cuenta/proyecto de Google Earth Engine habilitado y autenticación:
 
-1. **Activar el entorno virtual**:
-   ```powershell
-   .\.venv\Scripts\Activate.ps1
-   ```
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-earthengine.txt
+.\.venv\Scripts\earthengine.exe authenticate
+$env:EARTHENGINE_PROJECT = "mi-proyecto-habilitado"
+.\.venv\Scripts\python.exe -m streamlit run app.py
+```
 
-2. **Lanzar la aplicación**:
-   ```powershell
-   .\.venv\Scripts\streamlit run app.py
-   ```
+La aplicación no solicita credenciales ni inicia sesiones interactivas durante una consulta.
+Sin configuración, fallo remoto o ausencia de huellas válidas, informa indisponibilidad
+y no fabrica NDVI, biomasa ni sombreado. La consulta GEDI usa un compuesto histórico
+en 100 m alrededor del punto; no representa toda la finca ni fecha actual.
+La integración remota requiere verificación con un proyecto habilitado.
 
-3. **Abrir en el navegador**:
-   ```
-   http://localhost:8501
-   ```
+Productos y documentación:
+- [NASA POWER climatología](https://power.larc.nasa.gov/docs/services/api/temporal/climatology/)
+- [NASA POWER mensual](https://power.larc.nasa.gov/docs/services/api/temporal/monthly/)
+- [MOD13Q1 v061: NDVI, escala y calidad](https://developers.google.com/earth-engine/datasets/catalog/MODIS_061_MOD13Q1)
+- [GEDI L2A: RH98](https://developers.google.com/earth-engine/datasets/catalog/LARSE_GEDI_GEDI02_A_002_MONTHLY)
+- [GEDI L4A: AGBD](https://developers.google.com/earth-engine/datasets/catalog/LARSE_GEDI_GEDI04_A_002_MONTHLY)
+- [FAO: fundamentos físicos de heladas](https://www.fao.org/4/y7223e/y7223e09.htm)
+
+### Cartografía de suelos suministrada
+
+Guardar `src/data/layers/soils.geojson` para reemplazar la capa aproximada.
+Debe ser un FeatureCollection WGS84 con geometrías válidas y propiedades
+`soil_order` (Andisol, Ultisol, Inceptisol, Alfisol, Vertisol o Entisol) y
+`source` (procedencia/licencia) por cada polígono. No se incluye un archivo
+inventado de IMN/MAG.
+
+## API
+
+`GET /api/viability?lat=9.9281&lon=-84.0907&delta_temp_c=2&delta_precip_pct=-30&irrigation=true&shade=false`
+
+Devuelve cinco cultivos, pesos, contribuciones, límite crítico, rango de sensibilidad,
+escenario, procedencia, alertas, frío y disponibilidad de vegetación.
+Las coordenadas y escenarios se validan. Se conservan los campos anteriores de resultados.
+
+## Pruebas
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -B -m unittest discover -s tests -v
+```
+
+Incluye casos de aptitud ideal/extrema, sequía/riego/anegamiento, ausencia de datos,
+unidades, año bisiesto, rotaciones sin mínimos artificiales, separación de metas,
+calendario regional, cambio de año, NDVI/GEDI, API y navegación Streamlit.
+Las pruebas usan fixtures y no requieren NASA, credenciales ni acceso de red.
