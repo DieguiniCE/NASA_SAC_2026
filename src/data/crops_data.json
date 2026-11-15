@@ -3,24 +3,25 @@
     "crop": "Coffee",
     "common_name_es": "Café",
     "icon": "☕",
+    "reference_source": "ICAFE / Datos de cultivos",
     "ideal_temp_c": {
-      "min": 18,
-      "max": 24,
-      "sweet_spot": 21
+      "min": 17,
+      "max": 23,
+      "sweet_spot": 20
     },
     "tolerable_temp_c": {
-      "min": 15,
-      "max": 28
+      "min": 14,
+      "max": 26
     },
     "precipitation_mm": {
-      "min": 1500,
-      "max": 2500,
+      "min": 1000,
+      "max": 3000,
       "sweet_spot": 2000
     },
     "altitude_m": {
-      "min": 800,
-      "max": 1400,
-      "sweet_spot": 1100
+      "min": 500,
+      "max": 2000,
+      "sweet_spot": 1250
     },
     "soil_moisture_m3_m3": {
       "min": 0.22,
@@ -28,34 +29,34 @@
       "sweet_spot": 0.30
     },
     "soil_type": [
-      "Andisol",
-      "Loam",
-      "Inceptisol"
+      "Inceptisol",
+      "Andisol"
     ],
-    "watering_needs": "Moderate, well-drained with distinct dry season for flowering"
+    "watering_needs": "Moderate, well-drained with distinct dry season for flowering (ICAFE)"
   },
   {
     "crop": "Banana",
     "common_name_es": "Banano",
     "icon": "🍌",
+    "reference_source": "Datos de cultivos",
     "ideal_temp_c": {
-      "min": 24,
+      "min": 26,
       "max": 30,
-      "sweet_spot": 27
+      "sweet_spot": 28
     },
     "tolerable_temp_c": {
-      "min": 20,
-      "max": 35
+      "min": 22,
+      "max": 34
     },
     "precipitation_mm": {
       "min": 2000,
-      "max": 3200,
-      "sweet_spot": 2500
+      "max": 2500,
+      "sweet_spot": 2250
     },
     "altitude_m": {
-      "min": 0,
-      "max": 600,
-      "sweet_spot": 150
+      "min": 300,
+      "max": 500,
+      "sweet_spot": 400
     },
     "soil_moisture_m3_m3": {
       "min": 0.30,
@@ -63,9 +64,7 @@
       "sweet_spot": 0.38
     },
     "soil_type": [
-      "Inceptisol",
-      "Entisol",
-      "Ultisol"
+      "Inceptisol"
     ],
     "watering_needs": "High, constant soil moisture, deep alluvial soils"
   },
@@ -73,24 +72,25 @@
     "crop": "Sugar Cane",
     "common_name_es": "Caña de Azúcar",
     "icon": "🌾",
+    "reference_source": "Datos de cultivos",
     "ideal_temp_c": {
-      "min": 22,
+      "min": 25,
       "max": 32,
-      "sweet_spot": 28
+      "sweet_spot": 28.5
     },
     "tolerable_temp_c": {
-      "min": 18,
-      "max": 36
+      "min": 20,
+      "max": 35
     },
     "precipitation_mm": {
       "min": 1200,
-      "max": 2000,
-      "sweet_spot": 1600
+      "max": 2500,
+      "sweet_spot": 1850
     },
     "altitude_m": {
-      "min": 0,
+      "min": 800,
       "max": 1000,
-      "sweet_spot": 250
+      "sweet_spot": 900
     },
     "soil_moisture_m3_m3": {
       "min": 0.20,
@@ -98,9 +98,11 @@
       "sweet_spot": 0.28
     },
     "soil_type": [
-      "Alfisol",
+      "Inceptisol",
+      "Andisol",
       "Vertisol",
-      "Inceptisol"
+      "Alfisol",
+      "Ultisol"
     ],
     "watering_needs": "High vegetative water, needs dry ripening period before harvest"
   },
@@ -108,6 +110,7 @@
     "crop": "Pineapple",
     "common_name_es": "Piña",
     "icon": "🍍",
+    "reference_source": "Datos de cultivos",
     "ideal_temp_c": {
       "min": 22,
       "max": 30,
@@ -118,14 +121,14 @@
       "max": 34
     },
     "precipitation_mm": {
-      "min": 1500,
-      "max": 2500,
-      "sweet_spot": 1900
+      "min": 1000,
+      "max": 1500,
+      "sweet_spot": 1250
     },
     "altitude_m": {
       "min": 0,
-      "max": 600,
-      "sweet_spot": 150
+      "max": 900,
+      "sweet_spot": 450
     },
     "soil_moisture_m3_m3": {
       "min": 0.18,
@@ -133,9 +136,8 @@
       "sweet_spot": 0.25
     },
     "soil_type": [
-      "Ultisol",
-      "Inceptisol",
-      "Andisol"
+      "Alfisol",
+      "Ultisol"
     ],
     "watering_needs": "Moderate, highly intolerant to waterlogging; demands well-drained acidic soil"
   },
@@ -143,24 +145,25 @@
     "crop": "Avocado",
     "common_name_es": "Aguacate",
     "icon": "🥑",
+    "reference_source": "Datos de cultivos",
     "ideal_temp_c": {
-      "min": 16,
-      "max": 25,
-      "sweet_spot": 20
+      "min": 15,
+      "max": 30,
+      "sweet_spot": 22.5
     },
     "tolerable_temp_c": {
       "min": 12,
-      "max": 30
+      "max": 32
     },
     "precipitation_mm": {
-      "min": 1200,
+      "min": 1000,
       "max": 2000,
-      "sweet_spot": 1600
+      "sweet_spot": 1500
     },
     "altitude_m": {
-      "min": 600,
-      "max": 1800,
-      "sweet_spot": 1200
+      "min": 1800,
+      "max": 2500,
+      "sweet_spot": 2150
     },
     "soil_moisture_m3_m3": {
       "min": 0.22,
@@ -168,9 +171,7 @@
       "sweet_spot": 0.29
     },
     "soil_type": [
-      "Andisol",
-      "Inceptisol",
-      "Loam"
+      "Ultisol"
     ],
     "watering_needs": "Moderate, extremely sensitive to root rot (Phytophthora); requires porous soils"
   }
