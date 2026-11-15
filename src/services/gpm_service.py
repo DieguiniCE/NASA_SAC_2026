@@ -60,7 +60,7 @@ class GPMService:
                     # Central Valley
                     weights = [0.01, 0.01, 0.02, 0.05, 0.13, 0.12, 0.10, 0.12, 0.21, 0.18, 0.04, 0.01]
 
-                m_total = round(base_annual_mm * weights[i], 1)
+                m_total = round(base_annual_mm * weights[i] / sum(weights), 1)
 
             monthly_gpm[m] = m_total
             monthly_daily_rate[m] = round(m_total / days, 2)
@@ -89,7 +89,8 @@ class GPMService:
         est_max_daily_mm = round((peak_monthly_mm / 30.0) * 3.8, 1)
 
         return {
-            "source": cls.PRODUCT_ID,
+            "source": "Precipitaci?n derivada de POWER" if monthly_distribution else "Distribuci?n regional estimada",
+            "is_direct_gpm_observation": False,
             "mission": cls.MISSION,
             "annual_precipitation_mm": round(total_gpm_annual, 1),
             "monthly_precipitation_mm": monthly_gpm,

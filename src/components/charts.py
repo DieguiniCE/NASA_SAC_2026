@@ -516,7 +516,7 @@ def create_vulnerability_timeline_chart(
         go.Bar(
             x=months,
             y=precip,
-            name="Lluvia GPM (mm)" if lang == "es" else "GPM Rainfall (mm)",
+            name="Lluvia histórica (mm)" if lang == "es" else "Historical rainfall (mm)",
             marker_color="rgba(33, 150, 243, 0.35)" if not dark_mode else "rgba(66, 165, 245, 0.40)",
             marker_line=dict(color="#1976D2", width=1),
             hovertemplate="<b>%{x}</b>: %{y} mm<extra></extra>",
@@ -543,7 +543,7 @@ def create_vulnerability_timeline_chart(
         go.Scatter(
             x=months,
             y=bare_mono,
-            name="Suelo Desnudo (Monocultivo)" if lang == "es" else "Bare Soil (Monoculture)",
+            name="Meses observados con NDVI < 0.25" if lang == "es" else "Observed months with NDVI < 0.25",
             line=dict(color="#FB8C00" if not dark_mode else "#FFA726", width=2, dash="dash"),
             mode="lines+markers",
             marker=dict(size=5),

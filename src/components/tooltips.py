@@ -8,6 +8,12 @@ from typing import Dict
 
 # Dictionary specified in GEMINI.md
 SCIENTIFIC_DICTIONARY: Dict[str, Dict[str, str]] = {
+    "Riesgo de Heladas": {
+        "term_es": "Riesgo de Heladas", "category": "Temperatura", "category_en": "Temperature",
+        "definition": "Precautionary cold screening from minimum temperatures. Monthly means cannot confirm frost or inversions.",
+        "definition_es": "Alerta preventiva según mínimas: vigilancia entre 4 y 8 °C y alerta alta a 4 °C o menos. No confirma helada ni inversión; verificar mínimas diarias en finca.",
+        "sensor": "NASA POWER; validación local"
+    },
     "Evapotranspiration": {
         "term_es": "Evapotranspiración",
         "category": "Balance Hídrico",

@@ -6,6 +6,7 @@ from src.config import CR_LAT_MIN, CR_LAT_MAX, CR_LON_MIN, CR_LON_MAX
 from src.data.costa_rica_locations import COSTA_RICA_LOCATIONS, get_all_locations, find_closest_location
 from src.services.land_verification import validate_terrestrial_location
 from src.i18n import t
+from src.components.farmer_constraints import render_farmer_constraints, render_scenario_controls
 
 PAGE_ANALYZE  = "analyze"
 PAGE_CROPS    = "crops"
@@ -210,6 +211,9 @@ def render_sidebar() -> Tuple[str, float, float, str, bool, bool, str]:
             st.caption(t("click_hint"))
 
         st.markdown("---")
+
+        render_scenario_controls()
+        render_farmer_constraints()
 
         # Map layers toggle
         show_zones = st.toggle(t("show_zones"), value=True)

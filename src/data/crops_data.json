@@ -26,7 +26,7 @@
     "soil_moisture_m3_m3": {
       "min": 0.22,
       "max": 0.38,
-      "sweet_spot": 0.30
+      "sweet_spot": 0.3
     },
     "soil_type": [
       "Inceptisol",
@@ -59,7 +59,7 @@
       "sweet_spot": 400
     },
     "soil_moisture_m3_m3": {
-      "min": 0.30,
+      "min": 0.3,
       "max": 0.45,
       "sweet_spot": 0.38
     },
@@ -93,7 +93,7 @@
       "sweet_spot": 900
     },
     "soil_moisture_m3_m3": {
-      "min": 0.20,
+      "min": 0.2,
       "max": 0.35,
       "sweet_spot": 0.28
     },
@@ -139,7 +139,13 @@
       "Alfisol",
       "Ultisol"
     ],
-    "watering_needs": "Moderate, highly intolerant to waterlogging; demands well-drained acidic soil"
+    "watering_needs": "Moderate, highly intolerant to waterlogging; demands well-drained acidic soil",
+    "tolerable_precipitation_mm": {
+      "min": 600,
+      "max": 4000
+    },
+    "precipitation_tolerance_source": "https://archivo.revistas.ucr.ac.cr/index.php/agromeso/article/download/48171/50585?inline=1",
+    "precipitation_tolerance_note": "Rango de desarrollo reportado; no equivale a rendimiento óptimo. El exceso de lluvia requiere drenaje eficaz."
   },
   {
     "crop": "Avocado",

@@ -13,6 +13,7 @@ from src.services.data_lake import get_unified_environmental_profile
 from src.services.land_verification import validate_terrestrial_location
 from src.models.sensitivity_viability_model import SensitivityViabilityModel
 from src.data.crops_catalog import CROPS_LIST
+from src.services.seasonal_risk_service import build_seasonal_alerts
 from src.config import CR_LAT_MIN, CR_LAT_MAX, CR_LON_MIN, CR_LON_MAX
 
 app = FastAPI(
@@ -58,7 +59,11 @@ def list_crops():
 @app.get("/api/viability")
 def calculate_viability(
     lat: float = Query(..., description="Latitude (North)", ge=CR_LAT_MIN, le=CR_LAT_MAX),
-    lon: float = Query(..., description="Longitude (West)", ge=CR_LON_MIN, le=CR_LON_MAX)
+    lon: float = Query(..., description="Longitude (West)", ge=CR_LON_MIN, le=CR_LON_MAX),
+    delta_temp_c: float = Query(0.0, ge=-2, le=4),
+    delta_precip_pct: float = Query(0.0, ge=-40, le=40),
+    irrigation: bool = Query(False),
+    shade: bool = Query(False)
 ) -> Dict[str, Any]:
     """
     Core REST endpoint specified in GEMINI.md:
@@ -97,7 +102,9 @@ def calculate_viability(
             actual_precip_mm=actual_p,
             actual_altitude_m=actual_alt,
             actual_soil_moisture_m3_m3=actual_sm,
-            actual_soil_type=actual_soil
+            actual_soil_type=actual_soil,
+            delta_temp_c=delta_temp_c, delta_precip_pct=delta_precip_pct,
+            irrigation=irrigation, shade=shade, data_quality=env_profile["data_quality"]
         )
 
         return {
@@ -114,13 +121,13 @@ def calculate_viability(
                 "soil_absorption_potential": env_profile["humidity_and_moisture"]["soil_absorption_potential"],
                 "erosion_risk_level": env_profile["topography_and_erosion"]["erosion_risk_level"],
             },
-            "satellite_sources": {
-                "soil_moisture": "NASA SMAP (L2_SM_A/P & L4_SM)",
-                "precipitation": "NASA GPM (DPR Monthly)",
-                "topography": "NASA SRTM (30m Global DEM)",
-                "vegetation_stress": "NASA ECOSTRESS (ESI) & VIIRS",
-                "local_climate_soil": "IMN Costa Rica"
-            },
+            "satellite_sources": env_profile["provenance"],
+            "seasonal_alerts": build_seasonal_alerts(env_profile, delta_temp_c=delta_temp_c,
+                                                   delta_precip_pct=delta_precip_pct),
+            "frost_risk": env_profile["frost_risk"],
+            "vegetation": env_profile["vegetation"],
+            "scenario": {"delta_temp_c": delta_temp_c, "delta_precip_pct": delta_precip_pct,
+                         "irrigation": irrigation, "shade": shade},
             "crops_viability": viability_results
         }
     except Exception as e:

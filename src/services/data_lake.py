@@ -10,7 +10,10 @@ Harmonizes and synthesizes data across:
 """
 
 from typing import Dict, Any
-from src.services.nasa_power import fetch_nasa_power_climatology
+from src.services.nasa_power import fetch_nasa_power_climatology, fetch_power_monthly_history
+from src.services.vegetation_index_service import get_vegetation_profile, coverage_factor
+from src.services.imn_cr_service import calculate_frost_risk
+from concurrent.futures import ThreadPoolExecutor
 from src.services.smap_service import SMAPService
 from src.services.gpm_service import GPMService
 from src.services.ecostress_service import ECOSTRESSService
@@ -28,12 +31,20 @@ def get_unified_environmental_profile(lat: float, lon: float) -> Dict[str, Any]:
     # 1. Base Climatology from NASA POWER & Terrestrial Verification
     val = validate_terrestrial_location(lat, lon)
     closest_loc = val["closest_land_location"]
-    nasa_power_data = fetch_nasa_power_climatology(lat, lon)
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        climate_future = pool.submit(fetch_nasa_power_climatology, lat, lon)
+        history_future = pool.submit(fetch_power_monthly_history, lat, lon)
+        vegetation_future = pool.submit(get_vegetation_profile, lat, lon)
+        nasa_power_data = climate_future.result()
+        climate_history = history_future.result()
+        vegetation = vegetation_future.result()
     annual_sum = nasa_power_data.get("annual_summary", {})
     air_temp_c = annual_sum.get("mean_temp_c", 22.0)
     annual_precip_mm = annual_sum.get("annual_precipitation_mm", 2200.0)
     air_humidity_pct = annual_sum.get("mean_relative_humidity", 78.0)
-    elev_init = nasa_power_data.get("elevation_m") or closest_loc.get("elevation_m", 1000)
+    elev_init = closest_loc.get("elevation_m", 1000)
+    # POWER grid altitude is not a 30m site DEM; retain it as a temperature reference.
+    grid_elevation = nasa_power_data.get("elevation_m")
 
     # 2. NASA SRTM 30m Global Topography
     srtm_data = SRTMService.get_topography_profile(lat, lon, known_elevation_m=elev_init)
@@ -80,10 +91,29 @@ def get_unified_environmental_profile(lat: float, lon: float) -> Dict[str, Any]:
         lon=lon,
         elevation_m=true_elevation,
         r_erosivity=r_erosivity,
-        ls_topographic=ls_factor
+        ls_topographic=ls_factor,
+        cover_factor=coverage_factor(vegetation["ndvi"]["latest_ndvi"])
     )
 
+    minima = [v for k, v in nasa_power_data.get("parameters", {}).get("T2M_MIN", {}).items()
+              if k != "ANN" and isinstance(v, (int, float)) and -60 <= v <= 65]
+    frost = calculate_frost_risk(min(minima) if minima else None, true_elevation,
+                                 grid_elevation if not nasa_power_data.get("is_simulated", True) else None)
     return {
+        "climate_history": climate_history,
+        "vegetation": vegetation,
+        "frost_risk": frost,
+        "data_quality": "estimated",
+        "provenance": {
+            "climate": nasa_power_data["source"],
+            "climate_is_simulated": nasa_power_data.get("is_simulated", True),
+            "soil_moisture": "Estimación empírica; no descarga directa de SMAP",
+            "topography": "Elevación de localidad cercana y pendiente estimada; no DEM predial",
+            "soil": "Clasificación regional heurística; no análisis de laboratorio",
+            "precipitation": "NASA POWER o modelo regional; no descarga directa de GPM",
+            "thermal_stress": "Estimación empírica; no descarga directa de ECOSTRESS",
+            "power_grid_elevation_m": grid_elevation,
+        },
         "location": {
             "lat": lat,
             "lon": lon,
@@ -101,8 +131,8 @@ def get_unified_environmental_profile(lat: float, lon: float) -> Dict[str, Any]:
             "ground_surface_temperature_c": blended_ground_temp_c,
             "ground_temp_ecostress_lst_c": ground_temp_lst,
             "ground_temp_smap_layer1_c": ground_temp_smap,
-            "source_air": "NASA POWER / IMN",
-            "source_ground": "NASA ECOSTRESS (ECO2LSTE) & SMAP (L4_SM soil_temp_layer1)",
+            "source_air": nasa_power_data["source"],
+            "source_ground": "Estimación térmica empírica",
         },
         "humidity_and_moisture": {
             "air_relative_humidity_pct": air_humidity_pct,
@@ -121,7 +151,7 @@ def get_unified_environmental_profile(lat: float, lon: float) -> Dict[str, Any]:
             "gpm_peak_month": gpm_data["peak_rainfall_month"],
             "gpm_peak_monthly_mm": gpm_data["peak_monthly_mm"],
             "rainfall_erosivity_R": r_erosivity,
-            "historical_source": "NASA GPM DPR Monthly & IMERG Radar Climatology",
+            "historical_source": nasa_power_data["source"],
             "imn_projections": imn_data["climate_change_projections"],
         },
         "topography_and_erosion": {
@@ -136,7 +166,7 @@ def get_unified_environmental_profile(lat: float, lon: float) -> Dict[str, Any]:
             "erosion_risk_color": imn_data["erosion_risk_analysis"]["risk_color"],
             "soil_loss_estimated_ton_ha_yr": imn_data["erosion_risk_analysis"]["estimated_loss_ton_ha_yr"],
             "conservation_advice": imn_data["erosion_risk_analysis"]["conservation_advice"],
-            "elevation_source": "NASA SRTMGL1 (30m Global DEM)",
+            "elevation_source": "Localidad de referencia; pendiente estimada",
         },
         "soil": {
             "order": imn_data["soil_order_classified"],

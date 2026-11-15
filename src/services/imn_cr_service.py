@@ -171,7 +171,8 @@ class IMNCostaRicaService:
         lon: float,
         elevation_m: int = 1000,
         r_erosivity: float = 4200.0,
-        ls_topographic: float = 2.5
+        ls_topographic: float = 2.5,
+        cover_factor: float = None
     ) -> Dict[str, Any]:
         """
         Determines the dominant soil order, soil absorption potential,
@@ -220,7 +221,7 @@ class IMNCostaRicaService:
         # Water Erosion Risk Calculation (RUSLE: A = R * K * LS * C * P)
         # Using typical baseline vegetation cover factor C ~ 0.20 (mixed agricultural / pasture)
         # and support practice factor P ~ 0.85
-        c_factor = 0.20
+        c_factor = 0.20 if cover_factor is None else max(0.02, min(1.0, cover_factor))
         p_factor = 0.85
         estimated_soil_loss_t_ha_yr = round(r_erosivity * k_factor * ls_topographic * c_factor * p_factor * 0.01, 1)
 
@@ -264,3 +265,29 @@ class IMNCostaRicaService:
                 "conservation_advice": erosion_advice,
             }
         }
+
+
+
+
+def calculate_frost_risk(min_temperature_c, elevation_m, reference_elevation_m=None):
+    """Precautionary cold screening; monthly minima cannot detect an inversion."""
+    import math
+    if min_temperature_c is None or not math.isfinite(min_temperature_c) or min_temperature_c < -60:
+        return {"level": "Sin datos", "color": "gray", "adjusted_min_c": None,
+                "note": "No hay temperatura mínima válida."}
+    adjusted = min_temperature_c
+    # Apply lapse rate only between different known reference/site elevations.
+    # POWER surface temperature is already elevation-influenced; do not subtract
+    # elevation from sea level a second time.
+    if reference_elevation_m is not None:
+        adjusted -= 0.006 * (elevation_m - reference_elevation_m)
+    if adjusted <= 4:
+        level, color = "Alerta alta de frío / posible helada", "red"
+    elif adjusted <= 8:
+        level, color = "Vigilancia de enfriamiento / posible escarcha", "orange"
+    else:
+        level, color = "Bajo riesgo climatológico", "green"
+    return {"level": level, "color": color, "adjusted_min_c": round(adjusted, 1),
+            "high_elevation": elevation_m > 1800,
+            "note": "Umbrales preventivos, no helada confirmada. Se requieren mínimas diarias, "
+                    "nubosidad y viento para detectar inversión térmica; una media mensual no descarta heladas."}

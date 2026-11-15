@@ -14,10 +14,8 @@ TRANSLATIONS = {
     "app_subtitle":     {"es": "Explorador de Viabilidad Agroclimática · Costa Rica",
                          "en": "Agro-Climatic Crop Suitability Explorer · Costa Rica"},
     "data_fusion_notice": {
-        "es": "Los satélites de la NASA brindan cobertura continua; las estaciones del IMN aportan precisión local. "
-              "La fusión de ambas fuentes produce el perfil ambiental más exacto para cada coordenada de Costa Rica.",
-        "en": "NASA satellites provide continuous coverage; IMN ground stations add local precision. "
-              "Fusing both sources produces the most accurate environmental profile for each Costa Rica coordinate."},
+        "es": "NASA POWER aporta climatología cuando está disponible. Suelo, humedad y pendiente son estimaciones regionales. Consulte la procedencia antes de decidir en finca.",
+        "en": "NASA POWER supplies climatology when available. Soil, moisture and slope are regional estimates. Check provenance before farm decisions."},
     "tooltip_hint":     {"es": "(Pase el cursor sobre el texto subrayado para ver la ficha explicativa flotante).",
                          "en": "(Hover over the underlined text to see the floating info card)."},
 
