@@ -16,10 +16,10 @@ def render_sidebar() -> Tuple[str, float, float, str, bool]:
         st.markdown(
             """
             <div style="text-align: center; padding: 5px 0 15px 0;">
-                <span style="font-size: 42px;">🌱</span>
-                <h2 style="margin: 0; color: #1B5E20; font-weight: 700;">AgroClima CR</h2>
-                <span style="font-size: 12px; color: #555; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">
-                    NASA Space Apps Challenge
+                <span style="font-size: 38px;">🛰️🌱</span>
+                <h2 style="margin: 0; color: #1B5E20; font-weight: 700; font-size: 22px;">AgroClima CR</h2>
+                <span style="font-size: 11px; color: #555; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px;">
+                    NASA Satellites & IMN Costa Rica
                 </span>
             </div>
             """,
@@ -28,10 +28,12 @@ def render_sidebar() -> Tuple[str, float, float, str, bool]:
 
         st.markdown("### 🧭 Menú de Navegación")
         page_options = [
-            "📍 Explorador & Mapa Agroclimático",
-            "🌱 Evaluación de Cultivos (Preview)",
-            "📈 Tendencias y Cambio Climático (Preview)",
-            "ℹ️ Metodología y API NASA POWER",
+            "📍 Explorador Multibase & Mapa CR",
+            "🛰️ Sensores Satelitales (SMAP, GPM, ECOSTRESS, SRTM)",
+            "🪨 Suelos, Absorción y Erosión (IMN / MAG)",
+            "🌱 Modelo Básico de Viabilidad de Cultivo",
+            "📈 Proyecciones de Cambio Climático (IMN)",
+            "ℹ️ Catálogo de Bases de Datos",
         ]
         active_page = st.radio(
             "Seleccione una sección:",
@@ -42,7 +44,7 @@ def render_sidebar() -> Tuple[str, float, float, str, bool]:
 
         st.markdown("---")
         st.markdown("### 🗺️ Selección de Ubicación")
-        st.caption("Elija cómo desea indicar la ubicación en Costa Rica:")
+        st.caption("Indique la ubicación en Costa Rica para consultar los satélites:")
 
         input_mode = st.radio(
             "Método de selección:",
@@ -69,7 +71,6 @@ def render_sidebar() -> Tuple[str, float, float, str, bool]:
 
         if input_mode == "🏙️ Seleccionar por Cantón / Región":
             provinces = list(COSTA_RICA_LOCATIONS.keys())
-            # Find current province if possible
             default_prov_idx = 0
             for i, p in enumerate(provinces):
                 if any(l["name"] == loc_name for l in COSTA_RICA_LOCATIONS[p]):
@@ -96,10 +97,10 @@ def render_sidebar() -> Tuple[str, float, float, str, bool]:
                 st.rerun()
 
         elif input_mode == "✍️ Escribir nombre de localidad":
-            st.write("Escriba el nombre de una ciudad, cantón o zona agrícola:")
+            st.write("Escriba el nombre de una ciudad o cantón:")
             search_query = st.text_input(
                 "Buscar:",
-                placeholder="Ej. Tarrazú, Guápiles, San Carlos, Liberia...",
+                placeholder="Ej. Tarrazú, Guápiles, San Carlos, Liberia, Turrialba...",
                 label_visibility="collapsed"
             )
 
@@ -121,7 +122,7 @@ def render_sidebar() -> Tuple[str, float, float, str, bool]:
                             st.session_state["location_name"] = m["name"]
                             st.rerun()
                 else:
-                    st.warning("No se encontró una coincidencia directa en el catálogo predefinido. Puede ingresar coordenadas exactas.")
+                    st.warning("No se encontró coincidencia directa. Puede ingresar coordenadas exactas.")
 
         elif input_mode == "📐 Coordenadas manuales (Lat/Lon)":
             with st.form("manual_coords_form"):
@@ -141,7 +142,7 @@ def render_sidebar() -> Tuple[str, float, float, str, bool]:
                     format="%.4f",
                     step=0.01,
                 )
-                submitted = st.form_submit_button("Actualizar Mapa y Clima", use_container_width=True)
+                submitted = st.form_submit_button("Actualizar Coordenadas", use_container_width=True)
                 if submitted:
                     closest = find_closest_location(new_lat, new_lon)
                     st.session_state["selected_lat"] = new_lat
@@ -153,11 +154,10 @@ def render_sidebar() -> Tuple[str, float, float, str, bool]:
             st.info("💡 **Instrucción**: Toque o haga clic directamente en cualquier punto del mapa para seleccionarlo.")
 
         st.markdown("---")
-        st.markdown("### ⚙️ Opciones del Mapa")
+        st.markdown("### ⚙️ Capas Cartográficas")
         show_zones = st.toggle("Mostrar regiones agrícolas de referencia", value=True)
 
         st.markdown("---")
-        # Current active point summary in sidebar
         cur_lat = st.session_state["selected_lat"]
         cur_lon = st.session_state["selected_lon"]
         cur_name = st.session_state["location_name"]
@@ -165,7 +165,7 @@ def render_sidebar() -> Tuple[str, float, float, str, bool]:
         st.markdown(
             f"""
             <div style="background-color: #E8F5E9; border-left: 4px solid #2E7D32; padding: 10px; border-radius: 4px;">
-                <p style="margin: 0; font-size: 11px; color: #2E7D32; font-weight: bold; text-transform: uppercase;">Punto Activo</p>
+                <p style="margin: 0; font-size: 11px; color: #2E7D32; font-weight: bold; text-transform: uppercase;">Ubicación de Consulta</p>
                 <p style="margin: 3px 0 0 0; font-size: 13px; font-weight: 600; color: #1B5E20;">{cur_name}</p>
                 <p style="margin: 2px 0 0 0; font-size: 12px; color: #333;">Lat: <code>{cur_lat:.4f}</code> | Lon: <code>{cur_lon:.4f}</code></p>
             </div>
@@ -173,6 +173,18 @@ def render_sidebar() -> Tuple[str, float, float, str, bool]:
             unsafe_allow_html=True,
         )
 
-        st.caption("📡 Datos climatológicos provistos por NASA POWER Agroclimatology (AG).")
+        st.markdown(
+            """
+            <div style="margin-top: 10px; font-size: 11px; color: #666;">
+                <b>Bases integradas:</b><br>
+                🛰️ NASA SMAP (L2_SM_A/P & L4_SM)<br>
+                🛰️ NASA GPM DPR Monthly<br>
+                🛰️ NASA ECOSTRESS / VIIRS (ESI & LST)<br>
+                🛰️ NASA SRTM Global 30m<br>
+                🇨🇷 IMN / MAG Suelos & Clima CR
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
         return active_page, cur_lat, cur_lon, cur_name, show_zones

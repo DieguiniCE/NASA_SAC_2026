@@ -1,109 +1,106 @@
 # 🛰️ AgroClima Costa Rica | NASA Space Apps Challenge 2026
 
-**AgroClima CR** es una aplicación interactiva desarrollada en **Python** y **Streamlit** diseñada para evaluar la aptitud agroclimática de suelos y microclimas en Costa Rica, permitiendo determinar si el cultivo de especies agrícolas específicas (Café, Cacao, Piña, Banano, Caña de Azúcar, Arroz, Papa, Yuca, Frijol, etc.) es viable o representa un riesgo frente a las características naturales del lugar y el cambio climático.
-
-La aplicación integra la **API de Agroclimatología (AG) de NASA POWER** (*Prediction of Worldwide Energy Resources*), extrayendo métricas satelitales globales de temperatura, precipitación corregida, humedad relativa y radiación solar.
+**AgroClima CR** es una plataforma agroambiental y bioclimática desarrollada en **Python** y **Streamlit** diseñada para analizar la viabilidad del cultivo en cualquier punto geográfico de Costa Rica, integrando datos satelitales globales de observación de la Tierra provistos por la **NASA** e información climática y edafológica del **Instituto Meteorológico Nacional (IMN)** y el **Ministerio de Agricultura y Ganadería (MAG)**.
 
 ---
 
-## 🚀 Características Principales (Fase 1: Barebones UI y Mapa Interactivo)
+## 🛰️ Bases de Datos y Misiones Satelitales Integradas
 
-1. **🗺️ Mapa Interactivo de Costa Rica**:
-   - Desarrollado con **Folium** y **Leaflet**.
-   - **Selección Táctil / Clic Directo:** Toque o haga clic sobre cualquier cantón, valle, ladera o llanura del territorio nacional para reubicar el marcador de análisis.
-   - **Capas Múltiples:** Vista cartográfica clara, OpenStreetMap y vista Satelital de alta resolución (Esri).
-   - **Regiones Agrícolas de Referencia:** Muestra marcadores de distritos agrícolas y cuencas productivas clave en las 7 provincias.
+La aplicación conecta e implementa las siguientes fuentes de datos para evaluar las variables requeridas:
 
-2. **✍️ Selección de Ubicación Multi-Modal**:
-   - **Por Clic Táctil:** Captura inmediata de latitud y longitud al tocar el mapa.
-   - **Por Lista Predefinida:** Selector por Provincia (San José, Alajuela, Cartago, Heredia, Guanacaste, Puntarenas, Limón) y sus principales cantones y cuencas agrícolas.
-   - **Por Texto Libre / Búsqueda:** Escriba el nombre del cantón o región agrícola (ej. *Tarrazú, San Carlos, Pococí, Liberia*).
-   - **Por Coordenadas Manuales:** Ingrese valores exactos de Latitud Norte y Longitud Oeste dentro de los límites geográficos de Costa Rica.
-
-3. **🛰️ Integración con NASA POWER API**:
-   - Conexión al endpoint de climatología de la comunidad de **Agroclimatología (`AG`)**:
-     `https://power.larc.nasa.gov/api/temporal/climatology/point`
-   - Parámetros analizados:
-     - `T2M`: Temperatura media a 2 metros (°C)
-     - `T2M_MAX` / `T2M_MIN`: Temperaturas máximas y mínimas (°C)
-     - `PRECTOTCORR`: Precipitación corregida (mm/día y total mensual/anual)
-     - `RH2M`: Humedad relativa (%)
-     - `ALLSKY_SFC_SW_DWN`: Radiación solar global descendente (MJ/m²/día)
-     - `WS2M`: Velocidad del viento (m/s)
-   - Resiliencia local: Cuenta con un modelo microclimático calibrado para Costa Rica (gradiente altitudinal de Holdridge y vertientes Caribe/Pacífico) como respaldo en caso de desconexión.
-
-4. **📊 Visualizaciones Agroecológicas**:
-   - **Walter-Lieth Climadiagrama:** Gráfico interactivo en Plotly con barras de lluvia mensual superpuestas a la curva de temperatura para identificar períodos de déficit hídrico y floración.
-   - **Perfil de Radiación Solar y Humedad Relativa:** Comparativa anual mensual.
-   - **Tabla Detallada con Exportación CSV:** Descarga directa de datos agrometeorológicos para análisis agronómico.
-
-5. **🌱 Motor Barebones de Evaluación de Cultivos**:
-   - Catálogo agroclimático de cultivos tropicales con rangos óptimos y tolerables.
-   - Diagnóstico automatizado con puntuación porcentual (0 - 100%), veredicto agronómico y notas sobre vulnerabilidad climática (ej. roya del café por calor nocturno, acame por vientos en banano).
-   - Matriz comparativa simultánea de todos los cultivos para la ubicación seleccionada.
-
-6. **📈 Módulo Barebones de Cambio Climático**:
-   - Sensibilidad a eventos ENOS (El Niño / La Niña) por vertiente.
-   - Medidas recomendadas de adaptación y agricultura climáticamente inteligente (Sistemas Agroforestales, cosecha de agua, coberturas vivas).
+| Base de Datos / Misión | Producto / Instrucción | Variable Agroambiental Extraída | Resolución |
+| :--- | :--- | :--- | :--- |
+| **NASA SMAP** *(Soil Moisture Active Passive)* | **`L2_SM_A/P`** (`SPL2SMAP` / `SPL2SMP`) | **Humedad del Suelo Superficial** (0–5 cm, $m^3/m^3$) | 9 km / 33 km |
+| **NASA SMAP** | **`L4_SM`** (`SPL4SMGP`) | **Humedad en Zona Radicular** (0–100 cm, $m^3/m^3$) y **Temperatura del Suelo** (`soil_temp_layer1` a 5 cm) | 9 km EASE-Grid |
+| **NASA GPM** *(Global Precipitation Measurement)* | **`GPM DPR Monthly`** (`3DPR` / IMERG Monthly) | **Precipitación Mensual por Radar** (Bandas Ka/Ku), picos de tormenta y factor de erosividad pluvial ($R$) | 0.1° (~10 km) |
+| **NASA ECOSTRESS / VIIRS** | **`ECO_L4T_ESI`** & **`ECO2LSTE`** | **Índice de Estrés Evaporativo (ESI)** ($ET/PET$), humedad cuadriculada a 70m y **Temperatura Superficial Terrestre (LST / Ground Temp)** | 70 metros |
+| **NASA SRTM** *(Shuttle Radar Topography Mission)* | **`SRTMGL1`** (Global DEM) | **Elevación Topográfica Exacta** ($msnm$), **Pendiente del Terreno** (% y grados) y factor topográfico $LS$ | 30 metros (1 arc-sec) |
+| **IMN / MAG Costa Rica** | Cartografía CIA-UCR / IMN | **Órdenes de Suelo** (Andisol, Ultisol, Inceptisol, Alfisol, Vertisol, Entisol), textura, pH y **Potencial de Absorción e Infiltración** ($mm/h$) | Regionalizada CR |
+| **IMN Costa Rica** | Escenarios Regionalizados 2030 / 2050 | **Proyecciones de Cambio Climático** ($\Delta T$, $\Delta P$, variación estacional) para las 6 regiones del país | 6 subregiones CR |
+| **NASA POWER** | Agroclimatología (`community=AG`) | **Temperatura del Aire** (Media, Mín, Máx), Humedad Relativa (`RH2M`), Radiación Solar (`ALLSKY_SFC_SW_DWN`) y Viento | 0.5° global |
 
 ---
 
-## 📂 Estructura del Proyecto
+## 📊 Parámetros Clave Analizados
+
+1. **🌡️ Temperatura del Aire y del Suelo:**
+   - Temperatura del aire a 2 metros (`T2M`, Mín, Máx) provista por NASA POWER / IMN.
+   - Temperatura de la superficie del suelo provista por **NASA ECOSTRESS (LST)** y **NASA SMAP (L4_SM `soil_temp_layer1`)**.
+2. **🛡️ Riesgo de Erosión Hídrica:**
+   - Calculado mediante el modelo paramétrico **RUSLE** ($A = R \times K \times LS \times C \times P$), combinando la erosividad de lluvia $R$ de **GPM DPR**, la erodabilidad $K$ del suelo **IMN**, y la longitud/gradiente de pendiente $LS$ de **SRTM 30m**.
+3. **🪨 Tipo y Orden de Suelo:**
+   - Clasificación de órdenes según *Soil Taxonomy* en Costa Rica (Andisoles, Ultisoles, Inceptisoles, Alfisoles, Vertisoles, Entisoles) con sus propiedades físicas, químicas y de drenaje.
+4. **⛰️ Elevación Topográfica:**
+   - Elevación y relieve provistos por **NASA SRTM 30m**, junto con clasificación de aptitud para mecanización agrícola.
+5. **🌧️ Precipitación (Histórica y Proyecciones):**
+   - Serie histórica mensual de radar **GPM DPR** y NASA POWER.
+   - Escenarios regionalizados de cambio climático del **IMN para 2030 y 2050** ($\Delta T$, $\Delta P$).
+6. **💧 Humedad (Aire y Potencial de Absorción del Suelo):**
+   - Humedad relativa atmosférica (`RH2M`).
+   - Humedad superficial (0–5 cm) con **SMAP L2_SM_A/P**.
+   - Humedad radicular activa (0–100 cm) con **SMAP L4_SM**.
+   - **Potencial de absorción e infiltración hidráulica** ($mm/h$) y capacidad de retención de agua ($AWC$, $mm/m$) según el orden de suelo del IMN/MAG.
+
+---
+
+## 🌱 Modelo Básico de Viabilidad (Baseline Engine)
+
+Como se solicitó, se implementó un **modelo básico inicial** multivariable para evaluar la viabilidad de siembra sin entrar aún en el entrenamiento de redes neuronales o simulaciones complejas:
+- **Componente Térmico (25%):** Concordancia de T° de aire y suelo con el rango óptimo del cultivo.
+- **Componente Hídrico (25%):** Régimen pluvial (GPM) y disponibilidad hídrica en raíces (SMAP L4).
+- **Componente Edafológico (20%):** Afinidad con el orden de suelo (IMN) y drenaje/absorción.
+- **Componente Topográfico (15%):** Piso altitudinal (SRTM) y penalización por riesgo de erosión en pendiente.
+- **Componente de Resiliencia Climática (15%):** Vulnerabilidad ante el escenario IMN 2050.
+
+> [!NOTE]
+> Este modelo es un baseline modular diseñado para ser ajustado, calibrado o reemplazado por modelos de Machine Learning (ej. Random Forest, XGBoost) o modelos agroecológicos (DSSAT, APSIM) en etapas posteriores.
+
+---
+
+## 📂 Arquitectura de Archivos
 
 ```
 NASA_SAC_2026/
-├── app.py                     # Punto de entrada de la aplicación Streamlit
-├── requirements.txt           # Dependencias de Python fijadas
-├── README.md                  # Documentación del proyecto
+├── app.py                           # Punto de entrada Streamlit (Vistas multibase y menús)
+├── requirements.txt                 # Dependencias fijadas (Streamlit, Folium, Plotly, etc.)
+├── README.md                        # Documentación del sistema
 └── src/
-    ├── __init__.py
-    ├── config.py              # Constantes, límites geográficos y parámetros NASA
+    ├── config.py                    # Constantes, límites geográficos y parámetros NASA
     ├── services/
-    │   ├── __init__.py
-    │   └── nasa_power.py      # Cliente de la API de NASA POWER y modelo de respaldo
+    │   ├── data_lake.py             # Agregador y motor de fusión satelital + IMN
+    │   ├── smap_service.py          # NASA SMAP (L2_SM_A/P y L4_SM)
+    │   ├── gpm_service.py           # NASA GPM DPR Monthly & Erosividad R
+    │   ├── ecostress_service.py     # NASA ECOSTRESS / VIIRS (ESI & LST)
+    │   ├── srtm_service.py          # NASA SRTM 30m DEM & Pendiente
+    │   ├── imn_cr_service.py        # IMN Suelos, Absorción, Erosión RUSLE y Proyecciones 2050
+    │   └── nasa_power.py            # NASA POWER Agroclimatology (AG)
+    ├── models/
+    │   └── basic_viability.py       # Modelo básico de aptitud de cultivo multivariable
     ├── components/
-    │   ├── __init__.py
-    │   ├── map_view.py        # Mapa interactivo de Costa Rica con Folium
-    │   ├── sidebar.py         # Menús de navegación y controles de búsqueda
-    │   ├── metrics_display.py # Tarjetas de métricas e indicadores anuales
-    │   └── charts.py          # Gráficos agroclimáticos interactivos en Plotly
+    │   ├── map_view.py              # Mapa interactivo de Costa Rica (Folium)
+    │   ├── sidebar.py               # Menús de navegación y selector de ubicación
+    │   ├── metrics_display.py       # Tarjetas de indicadores ambientales
+    │   └── charts.py                # Gráficos Walter-Lieth, radar de aptitud y termometría
     └── data/
-        ├── __init__.py
-        ├── costa_rica_locations.py # Directorio de provincias, cantones y cultivos típicos
-        └── crops_catalog.py   # Reglas bioclimáticas y motor de evaluación de idoneidad
+        ├── costa_rica_locations.py  # Directorio de cantones y zonas agropecuarias de CR
+        └── crops_catalog.py         # Requerimientos biofísicos de cultivos tropicales
 ```
 
 ---
 
-## 🛠️ Instalación y Ejecución
+## 🚀 Instrucciones de Ejecución
 
-### 1. Activar el Entorno Virtual
+1. **Activar el entorno virtual**:
+   ```powershell
+   .\.venv\Scripts\Activate.ps1
+   ```
 
-En Windows (PowerShell):
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
+2. **Lanzar la aplicación**:
+   ```powershell
+   .\.venv\Scripts\streamlit run app.py
+   ```
 
-*(Si no existe el entorno virtual, créelo e instale los requisitos):*
-```powershell
-python -m venv .venv
-.\.venv\Scripts\pip install -r requirements.txt
-```
-
-### 2. Iniciar la Aplicación
-
-Ejecute Streamlit en el puerto local predeterminado:
-```powershell
-.\.venv\Scripts\streamlit run app.py
-```
-
-La aplicación abrirá automáticamente su navegador en `http://localhost:8501`.
-
----
-
-## 🌐 API de NASA POWER
-
-Documentación oficial: [NASA POWER API Docs](https://power.larc.nasa.gov/api/pages/)
-- Comunidad: `AG` (Agroclimatology)
-- Formato: JSON
-- Requiere API Key: **No** (Acceso público y libre provisto por la NASA).
+3. **Abrir en el navegador**:
+   ```
+   http://localhost:8501
+   ```

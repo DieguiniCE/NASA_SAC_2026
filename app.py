@@ -1,6 +1,6 @@
 """
 AgroClima Costa Rica - NASA Space Apps Challenge 2026
-Main Application Entrypoint
+Unified Multi-Satellite & IMN Environmental Intelligence Engine
 """
 
 import streamlit as st
@@ -17,13 +17,19 @@ from src.config import (
     CR_LON_MIN,
     CR_LON_MAX,
 )
-from src.data.costa_rica_locations import find_closest_location, get_all_locations
-from src.data.crops_catalog import CROPS_CATALOG, evaluate_crop_suitability
-from src.services.nasa_power import fetch_nasa_power_climatology
+from src.data.costa_rica_locations import find_closest_location
+from src.data.crops_catalog import CROPS_CATALOG
+from src.services.data_lake import get_unified_environmental_profile
+from src.models.basic_viability import calculate_basic_viability
 from src.components.sidebar import render_sidebar
 from src.components.map_view import render_costa_rica_map
 from src.components.metrics_display import render_climate_metrics
-from src.components.charts import create_climadiagram, create_humidity_solar_chart
+from src.components.charts import (
+    create_climadiagram,
+    create_moisture_comparison_chart,
+    create_viability_radar_chart,
+    create_temperature_breakdown_chart,
+)
 
 
 # 1. Page Configuration
@@ -39,43 +45,36 @@ st.markdown(
     """
     <style>
     .main-header {
-        background: linear-gradient(135deg, #1B5E20 0%, #2E7D32 50%, #388E3C 100%);
+        background: linear-gradient(135deg, #0D3814 0%, #1B5E20 50%, #2E7D32 100%);
         color: white;
-        padding: 18px 24px;
+        padding: 16px 24px;
         border-radius: 10px;
         margin-bottom: 20px;
         box-shadow: 0 4px 6px rgba(0,0,0,0.08);
     }
     .main-header h1 {
         margin: 0;
-        font-size: 26px;
+        font-size: 24px;
         font-weight: 700;
         letter-spacing: -0.5px;
         color: white !important;
     }
     .main-header p {
         margin: 4px 0 0 0;
-        font-size: 14px;
+        font-size: 13px;
         opacity: 0.92;
         color: #E8F5E9 !important;
     }
-    .status-badge {
+    .mission-badge {
         display: inline-block;
-        padding: 4px 10px;
-        border-radius: 12px;
-        font-size: 12px;
+        background-color: rgba(255,255,255,0.18);
+        border: 1px solid rgba(255,255,255,0.3);
+        padding: 3px 8px;
+        border-radius: 6px;
+        font-size: 11px;
         font-weight: 600;
-        margin-top: 6px;
-    }
-    .status-live {
-        background-color: #C8E6C9;
-        color: #1B5E20;
-        border: 1px solid #81C784;
-    }
-    .status-sim {
-        background-color: #FFF3E0;
-        color: #E65100;
-        border: 1px solid #FFB74D;
+        margin: 2px;
+        color: white;
     }
     .card-box {
         background: white;
@@ -85,6 +84,14 @@ st.markdown(
         box-shadow: 0 1px 3px rgba(0,0,0,0.04);
         margin-bottom: 15px;
     }
+    .chip {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        margin-right: 4px;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -92,40 +99,34 @@ st.markdown(
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def load_agroclima(lat: float, lon: float) -> Dict[str, Any]:
-    """Cached wrapper around NASA POWER agroclimatology fetcher."""
-    return fetch_nasa_power_climatology(lat, lon)
+def load_environmental_profile(lat: float, lon: float) -> Dict[str, Any]:
+    """Cached wrapper around unified multi-mission environmental data lake."""
+    return get_unified_environmental_profile(lat, lon)
 
 
 def main():
     # Render sidebar and retrieve user selections
     active_page, lat, lon, loc_name, show_zones = render_sidebar()
 
-    # Query NASA POWER Agroclimatology data
-    with st.spinner("Conectando con la API de NASA POWER..."):
-        clima_data = load_agroclima(lat, lon)
+    # Query Unified Multi-Database Environmental Profile
+    with st.spinner("Integrando bases satelitales (SMAP, GPM, ECOSTRESS, SRTM) e IMN Costa Rica..."):
+        env_profile = load_environmental_profile(lat, lon)
 
-    # Detect closest reference location for contextual information
-    closest_loc = find_closest_location(lat, lon)
-    elev = clima_data.get("elevation_m") or closest_loc.get("elevation_m", 1000)
-
-    # Application Header
-    status_class = "status-live" if not clima_data.get("is_simulated") else "status-sim"
-    status_icon = "🛰️" if not clima_data.get("is_simulated") else "⚡"
-    status_text = clima_data.get("source", "NASA POWER")
-
+    # Top Application Header
     st.markdown(
         f"""
         <div class="main-header">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
                 <div>
                     <h1>🌱 {APP_TITLE}</h1>
-                    <p>{APP_SUBTITLE} — Evaluación Agroclimática de Cultivos y Cambio Climático</p>
+                    <p>{APP_SUBTITLE} — Diagnóstico Biofísico Multifuente</p>
                 </div>
-                <div>
-                    <span class="status-badge {status_class}">
-                        {status_icon} {status_text}
-                    </span>
+                <div style="text-align: right;">
+                    <span class="mission-badge">🛰️ SMAP (L2/L4)</span>
+                    <span class="mission-badge">🛰️ GPM DPR</span>
+                    <span class="mission-badge">🛰️ ECOSTRESS/VIIRS</span>
+                    <span class="mission-badge">🛰️ SRTM 30m</span>
+                    <span class="mission-badge">🇨🇷 IMN / MAG</span>
                 </div>
             </div>
         </div>
@@ -134,16 +135,17 @@ def main():
     )
 
     # =========================================================================
-    # PAGE 1: EXPLORADOR Y MAPA AGROCLIMÁTICO (Página Principal)
+    # PAGE 1: EXPLORADOR MULTIBASE & MAPA CR (Página Principal)
     # =========================================================================
-    if active_page == "📍 Explorador & Mapa Agroclimático":
-        col_map, col_info = st.columns([1.6, 1.0], gap="medium")
+    if active_page == "📍 Explorador Multibase & Mapa CR":
+        col_map, col_info = st.columns([1.5, 1.0], gap="medium")
+
+        elev = env_profile["topography_and_erosion"]["elevation_msnm"]
+        closest_loc = find_closest_location(lat, lon)
 
         with col_map:
-            st.markdown("### 🗺️ Mapa Interactivo de Costa Rica")
-            st.caption(
-                "💡 **Interacción táctil**: Haga clic o toque cualquier punto del mapa nacional para cambiar la ubicación analizada."
-            )
+            st.markdown("### 🗺️ Mapa de Costa Rica (Selección Interactiva)")
+            st.caption("💡 Toque o haga clic directamente en cualquier punto para consultar los satélites e IMN.")
 
             # Render Folium Map
             clicked_coords = render_costa_rica_map(
@@ -152,13 +154,12 @@ def main():
                 location_name=loc_name,
                 elevation_m=elev,
                 show_reference_zones=show_zones,
-                map_height=490,
+                map_height=480,
             )
 
-            # If user clicked on the map, update state and trigger rerun
+            # If user clicked on the map, update coordinates in session_state and rerun
             if clicked_coords:
                 c_lat, c_lon = clicked_coords
-                # Check if click is a new coordinate (with slight tolerance to prevent loops)
                 if abs(c_lat - lat) > 0.005 or abs(c_lon - lon) > 0.005:
                     if CR_LAT_MIN <= c_lat <= CR_LAT_MAX and CR_LON_MIN <= c_lon <= CR_LON_MAX:
                         nearest = find_closest_location(c_lat, c_lon)
@@ -168,141 +169,260 @@ def main():
                         st.rerun()
 
         with col_info:
-            st.markdown("### 📍 Detalles de la Ubicación")
+            st.markdown("### 📍 Ficha Biofísica del Punto")
+            soil_info = env_profile["soil"]
+            topo = env_profile["topography_and_erosion"]
+            imn_region = env_profile["location"]["imn_region"]
 
             st.markdown(
                 f"""
                 <div class="card-box">
-                    <h4 style="margin: 0 0 10px 0; color: #1B5E20;">{loc_name}</h4>
-                    <p style="margin: 4px 0;"><b>Coordenadas:</b> Latitud <code>{lat:.4f}° N</code>, Longitud <code>{lon:.4f}° W</code></p>
-                    <p style="margin: 4px 0;"><b>Región / Cantón más cercano:</b> {closest_loc['canton']} ({closest_loc['province']})</p>
-                    <p style="margin: 4px 0;"><b>Piso Altitudinal Estimado:</b> ~{elev} msnm</p>
-                    <p style="margin: 4px 0;"><b>Zona Bioclimática:</b> {closest_loc.get('climate_type', 'Tropical')}</p>
+                    <h4 style="margin: 0 0 8px 0; color: #1B5E20;">{loc_name}</h4>
+                    <p style="margin: 3px 0; font-size: 13px;"><b>Coordenadas:</b> <code>{lat:.4f}° N</code>, <code>{lon:.4f}° W</code></p>
+                    <p style="margin: 3px 0; font-size: 13px;"><b>Región Climática IMN:</b> {imn_region}</p>
+                    <p style="margin: 3px 0; font-size: 13px;"><b>Elevación SRTM 30m:</b> {topo['elevation_msnm']} msnm (Pendiente: {topo['slope_percent']}%)</p>
+                    <p style="margin: 3px 0; font-size: 13px;"><b>Tipo de Suelo IMN:</b> <span style="color: #2E7D32; font-weight: bold;">{soil_info['order']}</span></p>
+                    <p style="margin: 3px 0; font-size: 13px;"><b>Potencial de Absorción:</b> {env_profile['humidity_and_moisture']['soil_absorption_potential']} ({soil_info['details']['infiltration_rate_mm_h']} mm/h)</p>
+                    <p style="margin: 3px 0; font-size: 13px;"><b>Riesgo de Erosión Hídrica:</b> <span style="font-weight: bold; color: {topo['erosion_risk_color']};">{topo['erosion_risk_level']}</span></p>
                     <div style="margin-top: 10px;">
-                        <span style="font-size: 12px; font-weight: bold; color: #555;">Cultivos Tradicionales en la Zona:</span><br>
-                        {''.join(f'<span style="display:inline-block; background:#E8F5E9; color:#2E7D32; padding:2px 8px; border-radius:10px; font-size:11px; margin:2px;">{crop}</span>' for crop in closest_loc.get('primary_crops', []))}
+                        <span style="font-size: 11px; font-weight: bold; color: #555;">Cultivos observados en la zona:</span><br>
+                        {''.join(f'<span class="chip" style="background:#E8F5E9; color:#1B5E20;">{crop}</span>' for crop in closest_loc.get('primary_crops', []))}
                     </div>
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
 
-            # Quick suitability teaser card
-            annual_sum = clima_data.get("annual_summary", {})
-            t_mean = annual_sum.get("mean_temp_c", 22.0)
-            p_ann = annual_sum.get("annual_precipitation_mm", 2000.0)
-            rh_mean = annual_sum.get("mean_relative_humidity", 78.0)
+            # Quick summary alert
+            root_status = env_profile["humidity_and_moisture"]["smap_root_status"]
+            st.info(f"🌿 **Estado Hídrico Radicular (SMAP L4):** {root_status}")
 
-            st.markdown("#### ⚡ Diagnóstico Agroclimático Rápido")
-            if t_mean < 18.0:
-                st.info("❄️ **Zona Fría / Montano**: Ideal para cultivos de altura (Papa, cebolla, café de especialidad, frutales de hoja caduca).")
-            elif t_mean <= 24.0:
-                st.success("🌤️ **Zona Templada / Valle**: Clima altamente versátil (Café, caña, hortalizas, frutales diversos).")
-            else:
-                st.warning("🔥 **Zona Cálida / Bajura**: Favorable para cultivos tropicales intensivos (Cacao, banano, piña, caña, palma, arroz).")
-
-            if p_ann < 1500:
-                st.markdown("⚠️ **Régimen Hídrico**: Déficit estacional marcado. Requiere considerar disponibilidad de agua o riego.")
-            elif p_ann > 3200:
-                st.markdown("🌧️ **Régimen Hídrico**: Alta pluviosidad perenne. Vital asegurar drenaje para evitar hongos y anegamiento.")
-            else:
-                st.markdown("💧 **Régimen Hídrico**: Pluviosidad moderada y bien balanceada para agricultura tropical.")
-
-        # Full-width Metrics Section
+        # Metrics Display Section
         st.markdown("---")
-        st.markdown("### 📊 Variables Naturales y Agrometeorológicas (Anuales)")
-        render_climate_metrics(clima_data)
+        st.markdown("### 📊 Indicadores Ambientales Integrados (Satélites NASA + IMN)")
+        render_climate_metrics(env_profile)
 
-        # Interactive Charts Section
+        # Plotly Walter-Lieth Climadiagram
         st.markdown("---")
-        st.markdown("### 📈 Perfil Climático a lo largo del Año")
+        st.plotly_chart(create_climadiagram(env_profile["raw_services"]["nasa_power"]), use_container_width=True)
 
-        tab_clima, tab_solar, tab_table = st.tabs([
-            "🌧️ Walter-Lieth Climadiagrama (Lluvia vs Temperatura)",
-            "☀️ Radiación Solar y Humedad Relativa",
-            "📋 Tabla de Datos Mensuales"
-        ])
+    # =========================================================================
+    # PAGE 2: SENSORES SATELITALES (SMAP, GPM, ECOSTRESS, SRTM)
+    # =========================================================================
+    elif active_page == "🛰️ Sensores Satelitales (SMAP, GPM, ECOSTRESS, SRTM)":
+        st.markdown("### 🛰️ Diagnóstico Específico por Misión Satelital")
+        st.caption("Extracción de variables físicas directas para las coordenadas seleccionadas:")
 
-        with tab_clima:
-            st.plotly_chart(create_climadiagram(clima_data), use_container_width=True)
-            st.caption(
-                "📌 *El climadiagrama combina la precipitación mensual (barras azules) con la curva de temperatura media (línea naranja). "
-                "Permite identificar con precisión los meses secos y los períodos de mayor humedad agropecuaria.*"
+        smap_p = env_profile["raw_services"]["smap"]["products"]
+        gpm_p = env_profile["raw_services"]["gpm"]
+        eco_p = env_profile["raw_services"]["ecostress"]
+        srtm_p = env_profile["raw_services"]["srtm"]
+
+        col_s1, col_s2 = st.columns(2)
+
+        # 1. NASA SMAP
+        with col_s1:
+            st.markdown("#### 1. NASA SMAP (Soil Moisture Active Passive)")
+            st.markdown(
+                """
+                - **L2_SM_A/P (Superficial 0-5 cm):** Mide la reflectividad de microondas en banda L.
+                - **L4_SM (Zona Radicular 0-100 cm):** Asimila observaciones satelitales en el modelo hidrológico NASA Catchment.
+                """
+            )
+            st.plotly_chart(
+                create_moisture_comparison_chart(
+                    smap_p["L2_SM_AP"]["value_m3_m3"],
+                    smap_p["L4_SM"]["value_m3_m3"],
+                    eco_p["evaporative_stress_index"]
+                ),
+                use_container_width=True
+            )
+            st.markdown(
+                f"""
+                - **Humedad Superficial (L2_SM_A/P):** `{smap_p['L2_SM_AP']['value_m3_m3']} m³/m³` (Saturación: `{smap_p['L2_SM_AP']['saturation_pct']}%`)
+                - **Humedad en Raíces (L4_SM):** `{smap_p['L4_SM']['value_m3_m3']} m³/m³` (Saturación: `{smap_p['L4_SM']['saturation_pct']}%`)
+                - **Temp. del Suelo (L4 layer 1):** `{smap_p['L4_SM']['ground_temperature_c']} °C`
+                """
             )
 
-        with tab_solar:
-            st.plotly_chart(create_humidity_solar_chart(clima_data), use_container_width=True)
-            st.caption(
-                "📌 *Datos de insolación diaria (ALLSKY_SFC_SW_DWN) y humedad a 2 metros (RH2M) provistos por satélites de NASA.*"
+        # 2. NASA ECOSTRESS / VIIRS
+        with col_s2:
+            st.markdown("#### 2. NASA ECOSTRESS & VIIRS (Estrés y Temperatura LST)")
+            st.markdown(
+                """
+                - **ECO_L4T_ESI (70m Tiled):** Ratio de evapotranspiración real a potencial ($ET/PET$).
+                - **ECO2LSTE (Land Surface Temperature):** Temperatura superficial del suelo y dosel mediante radiometría térmica infrarroja.
+                """
+            )
+            t_air = env_profile["temperatures"]["air_temperature_mean_c"]
+            t_ground = env_profile["temperatures"]["ground_surface_temperature_c"]
+            t_max = env_profile["temperatures"]["air_temperature_max_c"]
+            t_min = env_profile["temperatures"]["air_temperature_min_c"]
+
+            st.plotly_chart(create_temperature_breakdown_chart(t_air, t_ground, t_max, t_min), use_container_width=True)
+
+            st.markdown(
+                f"""
+                - **Índice de Estrés Evaporativo (ESI):** `{eco_p['evaporative_stress_index']}` ({eco_p['stress_evaluation']})
+                - **Temperatura del Suelo (LST):** `{eco_p['land_surface_temp_c']} °C` (Diferencial suelo-aire: `{eco_p['air_to_ground_delta_c']:+.1f} °C`)
+                - **Eficiencia en Uso del Agua (WUE):** `{eco_p['water_use_efficiency_g_kg']} g C / kg H₂O`
+                """
             )
 
-        with tab_table:
-            params = clima_data.get("parameters", {})
-            month_keys = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
-            df_table = pd.DataFrame({
-                "Mes": MONTH_NAMES,
-                "T° Media (°C)": [params.get("T2M", {}).get(m) for m in month_keys],
-                "T° Máxima (°C)": [params.get("T2M_MAX", {}).get(m) for m in month_keys],
-                "T° Mínima (°C)": [params.get("T2M_MIN", {}).get(m) for m in month_keys],
-                "Lluvia (mm/mes)": [params.get("PRECTOT_MONTHLY", {}).get(m) for m in month_keys],
-                "Humedad Rel. (%)": [params.get("RH2M", {}).get(m) for m in month_keys],
-                "Radiación (MJ/m²/día)": [params.get("ALLSKY_SFC_SW_DWN", {}).get(m) for m in month_keys],
-                "Viento (m/s)": [params.get("WS2M", {}).get(m) for m in month_keys],
+        st.markdown("---")
+        col_s3, col_s4 = st.columns(2)
+
+        # 3. NASA GPM DPR Monthly
+        with col_s3:
+            st.markdown("#### 3. NASA GPM (Dual-frequency Precipitation Radar)")
+            st.markdown(
+                """
+                El radar DPR (bandas Ku y Ka) mide la estructura vertical de las gotas de lluvia tropicales.
+                """
+            )
+            st.markdown(
+                f"""
+                - **Precipitación Anual Acumulada:** `{gpm_p['annual_precipitation_mm']} mm/año`
+                - **Mes con Mayor Pluviosidad:** `{gpm_p['peak_rainfall_month']}` (`{gpm_p['peak_monthly_mm']} mm`)
+                - **Intensidad de Tormenta Estimada:** `{gpm_p['est_max_daily_storm_mm']} mm / 24h`
+                - **Factor de Erosividad Pluvial (R):** `{gpm_p['rainfall_erosivity_R']} MJ·mm/(ha·h·año)` ({gpm_p['erosivity_classification']})
+                """
+            )
+
+        # 4. NASA SRTM 30m Global Topography
+        with col_s4:
+            st.markdown("#### 4. NASA SRTM (Shuttle Radar Topography Mission 30m)")
+            st.markdown(
+                """
+                Mapeo interferométrico de radar en banda C a 30 metros de resolución espacial.
+                """
+            )
+            st.markdown(
+                f"""
+                - **Elevación Exacta:** `{srtm_p['elevation_msnm']} msnm`
+                - **Pendiente del Terreno:** `{srtm_p['slope_percent']}%` (`{srtm_p['slope_degrees']}°`)
+                - **Tipo de Relieve:** `{srtm_p['landform_classification']}`
+                - **Aptitud para Mecanización:** {srtm_p['mechanization_capacity']}
+                - **Factor Topográfico LS (Erosión):** `{srtm_p['topographic_ls_factor']}`
+                """
+            )
+
+    # =========================================================================
+    # PAGE 3: SUELOS, ABSORCIÓN Y EROSIÓN (IMN / MAG)
+    # =========================================================================
+    elif active_page == "🪨 Suelos, Absorción y Erosión (IMN / MAG)":
+        st.markdown("### 🪨 Caracterización de Suelos y Riesgo de Erosión Hídrica")
+        st.caption("Datos compilados en concordancia con el Instituto Meteorológico Nacional (IMN), MAG y CIA-UCR:")
+
+        soil = env_profile["soil"]["details"]
+        erosion = env_profile["topography_and_erosion"]
+
+        c_soil1, c_soil2 = st.columns([1.1, 1.0])
+
+        with c_soil1:
+            st.markdown(f"#### 🧪 Orden de Suelo: **{soil['order']}**")
+            st.markdown(f"*{soil['description']}*")
+
+            df_soil_props = pd.DataFrame({
+                "Propiedad Edafológica": [
+                    "Textura Dominante",
+                    "Rango de pH",
+                    "Contenido de Materia Orgánica",
+                    "Potencial de Absorción",
+                    "Tasa de Infiltración Hidráulica",
+                    "Capacidad de Agua Disponible (AWC)",
+                    "Drenaje Natural",
+                    "Factor de Erodabilidad (K)"
+                ],
+                "Valor Característico": [
+                    soil["texture"],
+                    f"{soil['ph_range'][0]} - {soil['ph_range'][1]}",
+                    soil["organic_matter"],
+                    soil["absorption_potential"],
+                    f"{soil['infiltration_rate_mm_h']} mm/h",
+                    f"{soil['available_water_capacity_mm_m']} mm de agua / m suelo",
+                    soil["drainage"],
+                    f"{soil['erodibility_K']} (Resistencia a desprendimiento)"
+                ]
             })
-            st.dataframe(df_table, use_container_width=True)
+            st.table(df_soil_props)
+            st.success(f"🌱 **Recomendación de Manejo Agronómico:** {soil['agronomic_recommendation']}")
 
-            csv_data = df_table.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label="📥 Descargar Serie Climatológica (CSV)",
-                data=csv_data,
-                file_name=f"nasa_power_cr_{lat:.3f}_{lon:.3f}.csv",
-                mime="text/csv",
+        with c_soil2:
+            st.markdown("#### 🛡️ Análisis de Riesgo de Erosión Hídrica (Modelo RUSLE)")
+            st.markdown(
+                """
+                El modelo paramétrico RUSLE calcula la pérdida de suelo anual:
+                $$\\text{Pérdida } (A) = R \\times K \\times LS \\times C \\times P$$
+                """
+            )
+
+            rusle_factors = env_profile["raw_services"]["imn"]["erosion_risk_analysis"]["rusle_factors"]
+            st.markdown(
+                f"""
+                - **$R$ (Erosividad de lluvia GPM):** `{rusle_factors['R_rainfall_erosivity']}`
+                - **$K$ (Erodabilidad del suelo IMN):** `{rusle_factors['K_soil_erodibility']}`
+                - **$LS$ (Longitud y gradiente de pendiente SRTM):** `{rusle_factors['LS_topographic']}`
+                - **$C$ (Factor de cobertura vegetal media):** `{rusle_factors['C_cover_factor']}`
+                - **$P$ (Prácticas de soporte/conservación):** `{rusle_factors['P_conservation_factor']}`
+                """
+            )
+
+            # Erosion Result Box
+            st.markdown(
+                f"""
+                <div style="background-color: #FAFAFA; border-left: 6px solid {erosion['erosion_risk_color']}; padding: 14px; border-radius: 6px; margin: 15px 0;">
+                    <span style="font-size: 13px; font-weight: bold; color: #555;">NIVEL DE RIESGO DE EROSIÓN</span>
+                    <h3 style="margin: 4px 0; color: {erosion['erosion_risk_color']};">{erosion['erosion_risk_level']}</h3>
+                    <p style="margin: 2px 0; font-size: 14px;"><b>Pérdida Estimada:</b> {erosion['soil_loss_estimated_ton_ha_yr']} ton / ha / año</p>
+                    <p style="margin: 6px 0 0 0; font-size: 13px; color: #333;"><b>Medida Preventiva:</b> {erosion['conservation_advice']}</p>
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
 
     # =========================================================================
-    # PAGE 2: EVALUACIÓN DE CULTIVOS (BAREBONES / PREVIEW)
+    # PAGE 4: MODELO BÁSICO DE VIABILIDAD DE CULTIVO
     # =========================================================================
-    elif active_page == "🌱 Evaluación de Cultivos (Preview)":
-        st.markdown("### 🌱 Motor de Evaluación de Idoneidad de Cultivos")
-        st.markdown(
-            f"Analizando la aptitud para el punto seleccionado: **{loc_name}** "
-            f"(Lat: `{lat:.4f}`, Lon: `{lon:.4f}`, Elevación: ~`{elev}` msnm)."
+    elif active_page == "🌱 Modelo Básico de Viabilidad de Cultivo":
+        st.markdown("### 🌱 Modelo Básico de Viabilidad Agroclimática (Baseline)")
+        st.info(
+            "📌 **Nota técnica**: Este es un modelo heurístico preliminar de evaluación multivariable "
+            "(temperatura aire/suelo, humedad radicular SMAP, precipitación GPM, orden de suelo IMN, pendiente SRTM y proyecciones). "
+            "Está estructurado modularmente para ser modificado o sustituido por modelos predictivos avanzados en fases posteriores."
         )
-
-        annual_sum = clima_data.get("annual_summary", {})
-        t_mean = annual_sum.get("mean_temp_c", 22.0)
-        p_ann = annual_sum.get("annual_precipitation_mm", 2000.0)
-        rh_mean = annual_sum.get("mean_relative_humidity", 78.0)
 
         crop_ids = list(CROPS_CATALOG.keys())
         crop_names = [f"{CROPS_CATALOG[cid]['icon']} {CROPS_CATALOG[cid]['name']}" for cid in crop_ids]
 
-        selected_crop_idx = st.selectbox(
-            "Seleccione el cultivo para evaluar en este punto:",
+        sel_crop_idx = st.selectbox(
+            "Seleccione el cultivo a evaluar:",
             range(len(crop_ids)),
             format_func=lambda i: crop_names[i],
         )
-        selected_crop_id = crop_ids[selected_crop_idx]
-        eval_result = evaluate_crop_suitability(selected_crop_id, t_mean, p_ann, rh_mean)
-        crop_info = eval_result["crop"]
+        target_crop_id = crop_ids[sel_crop_idx]
 
-        c_eval1, c_eval2 = st.columns([1.2, 1.0])
+        # Calculate viability with basic model
+        viability = calculate_basic_viability(target_crop_id, env_profile)
 
-        with c_eval1:
-            st.markdown(f"#### Diagnóstico para {crop_info['icon']} **{crop_info['name']}**")
+        col_v1, col_v2 = st.columns([1.1, 1.0])
 
-            # Score and Verdict
-            badge_color = eval_result["badge_color"]
+        with col_v1:
+            badge_c = viability["badge_color"]
+            color_hex = "#2E7D32" if badge_c == "green" else "#1565C0" if badge_c == "blue" else "#E65100" if badge_c == "orange" else "#C62828"
+
             st.markdown(
                 f"""
-                <div style="background-color: #FAFAFA; border: 2px solid {'#4CAF50' if badge_color=='green' else '#2196F3' if badge_color=='blue' else '#FF9800' if badge_color=='orange' else '#F44336'}; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                <div style="background: white; border: 2px solid {color_hex}; border-radius: 8px; padding: 18px; margin-bottom: 15px;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-size: 22px; font-weight: bold; color: #333;">{eval_result['verdict']}</span>
-                        <span style="font-size: 26px; font-weight: 800; color: {'#2E7D32' if badge_color=='green' else '#1565C0' if badge_color=='blue' else '#E65100' if badge_color=='orange' else '#C62828'};">{eval_result['score']} / 100</span>
-                    </div>
-                    <div style="margin-top: 10px;">
-                        <div style="background-color: #E0E0E0; border-radius: 6px; height: 12px; width: 100%;">
-                            <div style="background-color: {'#4CAF50' if badge_color=='green' else '#2196F3' if badge_color=='blue' else '#FF9800' if badge_color=='orange' else '#F44336'}; height: 12px; border-radius: 6px; width: {eval_result['score']}%;"></div>
+                        <div>
+                            <span style="font-size: 12px; color: #777; font-weight: bold; text-transform: uppercase;">Diagnóstico de Viabilidad</span>
+                            <h3 style="margin: 2px 0; color: #222;">{viability['crop_icon']} {viability['crop_name']}</h3>
+                            <span style="font-size: 16px; font-weight: bold; color: {color_hex};">{viability['verdict']}</span>
+                        </div>
+                        <div style="text-align: right;">
+                            <span style="font-size: 38px; font-weight: 800; color: {color_hex};">{viability['overall_score']}</span>
+                            <span style="font-size: 16px; color: #888;">/ 100</span>
                         </div>
                     </div>
                 </div>
@@ -310,111 +430,107 @@ def main():
                 unsafe_allow_html=True,
             )
 
-            st.markdown("##### 🔍 Factores Evaluados:")
-            for note in eval_result["notes"]:
-                st.write(note)
+            st.markdown("#### 🎯 Factores Favorables Detectados:")
+            if viability["positive_factors"]:
+                for pos in viability["positive_factors"]:
+                    st.write(f"✅ {pos}")
+            else:
+                st.write("Ningún factor sobresaliente en rango óptimo.")
 
-            st.markdown("##### ⚠️ Vulnerabilidad ante el Cambio Climático:")
-            st.warning(crop_info["climate_vulnerability"])
+            st.markdown("#### ⚠️ Factores Limitantes o de Riesgo:")
+            if viability["limiting_factors"]:
+                for lim in viability["limiting_factors"]:
+                    st.write(f"⚠️ {lim}")
+            else:
+                st.write("No se identificaron restricciones agronómicas severas.")
 
-        with c_eval2:
-            st.markdown("#### 📋 Ficha Técnica Agroecológica")
-            st.markdown(f"**Categoría:** {crop_info['category']}")
-            st.write(crop_info["description"])
-
-            st.markdown("##### Rangos Óptimos vs Medidos:")
-            t_opt = crop_info["temp_opt"]
-            p_opt = crop_info["precip_opt"]
-            h_opt = crop_info["humidity_opt"]
-
-            comp_df = pd.DataFrame({
-                "Parámetro": ["Temperatura Media", "Precipitación Anual", "Humedad Relativa"],
-                "Valor en esta Ubicación": [f"{t_mean:.1f} °C", f"{p_ann:.0f} mm", f"{rh_mean:.1f} %"],
-                "Rango Óptimo Cultivo": [f"{t_opt[0]} a {t_opt[1]} °C", f"{p_opt[0]:.0f} a {p_opt[1]:.0f} mm", f"{h_opt[0]:.0f} a {h_opt[1]:.0f} %"],
-            })
-            st.table(comp_df)
+        with col_v2:
+            st.plotly_chart(
+                create_viability_radar_chart(
+                    viability["score_breakdown"],
+                    viability["crop_name"].split("(")[0].strip(),
+                    viability["overall_score"]
+                ),
+                use_container_width=True
+            )
 
         st.markdown("---")
-        st.markdown("### 📊 Matriz Comparativa General de Todos los Cultivos en este Punto")
+        st.markdown("### 📊 Matriz Comparativa de Todos los Cultivos en esta Zona")
 
-        all_results = []
+        all_crops_summary = []
         for cid in crop_ids:
-            res = evaluate_crop_suitability(cid, t_mean, p_ann, rh_mean)
-            c = res["crop"]
-            all_results.append({
-                "Cultivo": f"{c['icon']} {c['name'].split('(')[0].strip()}",
-                "Puntaje de Aptitud": f"{res['score']}%",
+            res = calculate_basic_viability(cid, env_profile)
+            all_crops_summary.append({
+                "Cultivo": f"{res['crop_icon']} {res['crop_name'].split('(')[0].strip()}",
+                "Viabilidad Global": f"{res['overall_score']}%",
                 "Veredicto": res["verdict"],
-                "T° Óptima (°C)": f"{c['temp_opt'][0]} - {c['temp_opt'][1]}",
-                "Lluvia Óptima (mm)": f"{c['precip_opt'][0]:.0f} - {c['precip_opt'][1]:.0f}",
+                "Térmico": f"{res['score_breakdown']['Térmico (Aire y Suelo)']}%",
+                "Hídrico / Raíces": f"{res['score_breakdown']['Hídrico (Lluvia y Raíces)']}%",
+                "Suelo IMN": f"{res['score_breakdown']['Edafológico (Suelo y Absorción)']}%",
+                "Topografía & Pendiente": f"{res['score_breakdown']['Topográfico y Erosión']}%",
+                "Resiliencia Cambio Climático": f"{res['score_breakdown']['Resiliencia Climática (2050)']}%",
             })
 
-        df_all = pd.DataFrame(all_results)
-        st.dataframe(df_all, use_container_width=True)
+        st.dataframe(pd.DataFrame(all_crops_summary), use_container_width=True)
 
     # =========================================================================
-    # PAGE 3: TENDENCIAS Y CAMBIO CLIMÁTICO (BAREBONES / PREVIEW)
+    # PAGE 5: PROYECCIONES DE CAMBIO CLIMÁTICO (IMN)
     # =========================================================================
-    elif active_page == "📈 Tendencias y Cambio Climático (Preview)":
-        st.markdown("### 📈 Tendencias y Vulnerabilidad al Cambio Climático")
-        st.info("💡 Este módulo integrará proyecciones a futuro y análisis de anomalías térmicas y de precipitación.")
+    elif active_page == "📈 Proyecciones de Cambio Climático (IMN)":
+        st.markdown("### 📈 Escenarios de Cambio Climático Regionalizados (IMN Costa Rica)")
+        proj = env_profile["precipitation"]["imn_projections"]
+        imn_reg = env_profile["location"]["imn_region"]
 
-        c_cc1, c_cc2 = st.columns(2)
+        st.markdown(f"#### Subregión Meteorológica Activa: **{imn_reg}**")
 
-        with c_cc1:
-            st.markdown("#### 🌡️ Desafíos Climáticos en Costa Rica")
+        c_p1, c_p2 = st.columns(2)
+        with c_p1:
             st.markdown(
-                """
-                - **Fenómeno ENOS (El Niño / La Niña):**
-                  - *El Niño:* Sequía y aumento de temperaturas en la Vertiente del Pacífico (Guanacaste, Valle Central); lluvias intensas en el Caribe.
-                  - *La Niña:* Inundaciones y exceso de precipitaciones en el Pacífico y Zona Sur; sequías relativas en el Caribe.
-                - **Aumento de Temperaturas Mínimas Nocturnas:**
-                  - Afecta la calidad de taza del café arábica al acelerar la maduración del grano y favorecer la esporulación de hongos como la roya (*Hemileia vastatrix*).
-                - **Desplazamiento Altitudinal de Zonas de Vida:**
-                  - Los pisos térmicos óptimos se desplazan entre 100 y 250 metros hacia arriba, forzando a los productores a adaptar variedades o tecnologías.
-                """
+                f"""
+                <div class="card-box">
+                    <h4 style="margin: 0 0 10px 0; color: #E65100;">Horizonte Temporal 2030 (Corto Plazo)</h4>
+                    <p><b>Aumento de Temperatura Proyectado (ΔT):</b> <code>{proj['temp_change_2030']}</code></p>
+                    <p><b>Variación de Precipitación Proyectada (ΔP):</b> <code>{proj['precip_change_2030']}</code></p>
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
 
-        with c_cc2:
-            st.markdown("#### 🛡️ Medidas de Adaptación Recomendadas")
+        with c_p2:
             st.markdown(
-                """
-                1. **Sistemas Agroforestales (SAF):**
-                   - Uso de árboles de sombra (Guaba, Plátano, Madero Negro) para amortiguar hasta 3-4°C de temperatura en el dosel.
-                2. **Manejo de Suelos y Coberturas Vivas:**
-                   - Siembra en curvas de nivel y cobertura de rastrojo para reducir la evaporación del suelo en épocas secas.
-                3. **Cosecha de Agua y Riego Eficiente:**
-                   - Reservorios en fincas y riego por goteo para mitigar los veranillos prolongados.
-                4. **Variedades Resilientes:**
-                   - Híbridos F1 de café tolerantes a la roya y con resistencia a sequía.
-                """
+                f"""
+                <div class="card-box">
+                    <h4 style="margin: 0 0 10px 0; color: #C62828;">Horizonte Temporal 2050 (Mediano Plazo)</h4>
+                    <p><b>Aumento de Temperatura Proyectado (ΔT):</b> <code>{proj['temp_change_2050']}</code></p>
+                    <p><b>Variación de Precipitación Proyectada (ΔP):</b> <code>{proj['precip_change_2050']}</code></p>
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
 
-    # =========================================================================
-    # PAGE 4: METODOLOGÍA Y API NASA POWER
-    # =========================================================================
-    elif active_page == "ℹ️ Metodología y API NASA POWER":
-        st.markdown("### ℹ️ Acerca de AgroClima CR y la API de NASA POWER")
+        st.markdown("#### 🔍 Impactos Biofísicos Proyectados por el IMN en esta Región:")
+        st.write(f"- **Patrón de Estación Seca:** {proj['dry_season_impact']}")
+        st.write(f"- **Eventos Hidrometeorológicos Extremos:** {proj['extreme_rain_impact']}")
 
+    # =========================================================================
+    # PAGE 6: CATÁLOGO DE BASES DE DATOS
+    # =========================================================================
+    elif active_page == "ℹ️ Catálogo de Bases de Datos":
+        st.markdown("### ℹ️ Catálogo de Bases de Datos y Misiones Satelitales")
         st.markdown(
             """
-            Esta aplicación aprovecha los conjuntos de datos abiertos de observación de la Tierra de **NASA POWER**
-            *(Prediction of Worldwide Energy Resources)*, diseñados específicamente para apoyar la investigación agrícola,
-            la energía solar y la modelación agroclimática global.
+            Esta aplicación implementa las siguientes fuentes de datos oficiales para el análisis agroambiental en Costa Rica:
 
-            #### 🛰️ Parámetros de Agroclimatología (Comunidad `AG`) utilizados:
-            - **`T2M` (Temperature at 2 Meters):** Temperatura media diaria del aire a 2 metros sobre la superficie terrestre (°C).
-            - **`T2M_MAX` / `T2M_MIN`:** Temperaturas máximas y mínimas registradas para la evaluación de estrés térmico vegetal.
-            - **`PRECTOTCORR` (Precipitation Corrected):** Tasa de precipitación corregida (mm/día) derivada de modelos asimilados de la NASA (MERRA-2 / GEOS).
-            - **`RH2M` (Relative Humidity at 2 Meters):** Humedad relativa del aire a 2 metros (%).
-            - **`ALLSKY_SFC_SW_DWN`:** Radiación solar global descendente sobre la superficie para estimación de fotosíntesis y evapotranspiración.
-            - **`WS2M`:** Velocidad del viento a 2 metros de altura (m/s).
-
-            #### 🔗 Enlace Oficial a la Documentación:
-            Consulte la documentación de la API en: [NASA POWER API Documentation](https://power.larc.nasa.gov/api/pages/)
-
-            ---
-            *Desarrollado para el NASA Space Apps Challenge 2026. Proyecto enfocado en la resiliencia agroalimentaria de Costa Rica.*
+            | Base de Datos / Misión | Instrumento / Producto | Parámetro Analizado | Resolución |
+            | :--- | :--- | :--- | :--- |
+            | **NASA SMAP** | `L2_SM_A/P` (SPL2SMAP) | Humedad volumétrica superficial (0-5 cm) | 9 km / 33 km |
+            | **NASA SMAP** | `L4_SM` (SPL4SMGP) | Humedad volumétrica en zona radicular (0-100 cm) y temperatura del suelo capa 1 | 9 km EASE-Grid |
+            | **NASA GPM** | `GPM DPR Monthly` (3DPR / IMERG) | Lluvia mensual calibrada por radar Ka/Ku y factor de erosividad pluvial ($R$) | 0.1° (~10 km) |
+            | **NASA ECOSTRESS / VIIRS** | `ECO_L4T_ESI` & `ECO2LSTE` | Índice de Estrés Evaporativo ($ET/PET$), humedad cuadriculada y temperatura del suelo ($LST$) | 70 metros |
+            | **NASA SRTM** | `SRTMGL1` (Global DEM) | Elevación topográfica, pendiente (%) y factor topográfico $LS$ de erosión | 30 metros (1 arc-sec) |
+            | **IMN / MAG Costa Rica** | Cartografía CIA-UCR / IMN | Tipo y orden de suelo, potencial de absorción/infiltración e hidrología | Regionalizada CR |
+            | **IMN Costa Rica** | Escenarios Regionales 2030/2050 | Proyecciones climáticas (ΔT, ΔP) por cuenca y región | 6 regiones CR |
+            | **NASA POWER** | Agroclimatología (`AG`) | Climatología histórica de temperatura del aire, radiación solar y viento | 0.5° global |
             """
         )
 
