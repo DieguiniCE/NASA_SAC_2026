@@ -875,6 +875,8 @@ def main():
 
             strat_title = c_strat["name_es"] if current_lang == "es" else c_strat["name_en"]
             strat_tag = c_strat["tag_es"] if current_lang == "es" else c_strat["tag_en"]
+            strat_concept = c_strat.get("concept_es" if current_lang == "es" else "concept_en", "")
+            concept_preview = (strat_concept[:105] + "…") if len(strat_concept) > 105 else strat_concept
             net_vs_base = c_strat["net_advantage_vs_baseline"]
             net_txt = f"+{net_vs_base}%" if net_vs_base > 0 else f"{net_vs_base}%"
             net_color = "#2E7D32" if net_vs_base > 0 else ("#757575" if net_vs_base == 0 else "#D32F2F")
@@ -885,7 +887,8 @@ def main():
                     <div>
                         <div style="margin-bottom:6px;">{badge_html}</div>
                         <h4 style="margin:2px 0 4px 0; font-size:14px; font-weight:800; color:{txt_col};">{c_strat.get('icon', '🌱')} {strat_title.split(':')[0]}</h4>
-                        <div style="font-size:11px; font-weight:700; color:#E65100; margin-bottom:8px;">{strat_tag}</div>
+                        <div style="font-size:11px; font-weight:700; color:#E65100; margin-bottom:6px;">{strat_tag}</div>
+                        <p style="font-size:11px; color:{txt_col}; margin:0 0 8px 0; line-height:1.35; opacity:0.85;">{concept_preview}</p>
                     </div>
                     <div>
                         <div style="display:flex; justify-content:space-between; align-items:baseline; margin:6px 0;">
@@ -927,6 +930,15 @@ def main():
         col_pills_L, col_pills_R = st.columns([1.15, 0.95], gap="large")
 
         with col_pills_L:
+            # Concept Overview: In what does this strategy consist?
+            st.markdown(f"#### {t('concept_title')}")
+            concept_full = active_strat.get("concept_es" if current_lang == "es" else "concept_en", "")
+            st.markdown(f"""
+            <div style="background:{bg_card}; border:1px solid {border_card}; border-left:5px solid #2E7D32; border-radius:6px; padding:13px 15px; margin-bottom:14px; font-size:13px; color:{txt_col}; line-height:1.5;">
+                <b>🌾 {'Descripción Operativa' if current_lang == 'es' else 'Operational Description'}:</b> {concept_full}
+            </div>
+            """, unsafe_allow_html=True)
+
             # Pillar 1: Why it was suggested
             st.markdown(f"#### {t('why_suggested_title')}")
             why_txt = active_strat["why_suggested_es"] if current_lang == "es" else active_strat["why_suggested_en"]

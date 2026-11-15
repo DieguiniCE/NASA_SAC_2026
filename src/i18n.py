@@ -119,6 +119,8 @@ TRANSLATIONS = {
     "priority_income":   {"es": "💰 Ingresos Suplementarios & Mercado",           "en": "💰 Supplemental Income & Cash Flow"},
     "priority_pest":     {"es": "🛡️ Control Biológico de Plagas & Nemátodos",    "en": "🛡️ Biological Pest & Nematode Disruption"},
     "priority_erosion":  {"es": "⛰️ Protección Antierosión en Laderas",           "en": "⛰️ Slope Erosion Mitigation"},
+    "concept_title":       {"es": "📖 ¿En qué consiste esta Estrategia?",
+                            "en": "📖 What does this Strategy Consist Of?"},
     "why_suggested_title": {"es": "💡 Por qué se sugiere esta Estrategia",
                             "en": "💡 Why this Strategy was Suggested"},
     "evidence_title":      {"es": "🛰️ Evidencia Satelital & Terrestre (NASA + IMN)",

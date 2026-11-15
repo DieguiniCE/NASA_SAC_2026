@@ -171,6 +171,8 @@ MULTI_STRATEGY_CATALOG: Dict[str, List[Dict[str, Any]]] = {
             "tag_es": "Práctica Existente / Monocultivo Continuo",
             "tag_en": "Existing Practice / Continuous Monoculture",
             "primary_goal": "income",
+            "concept_es": "Consiste en cultivar únicamente cafetos en hileras continuas manteniendo las calles totalmente limpias mediante herbicidas sintéticos periódicos, sin intercalar coberturas vivas ni leguminosas; la nutrición depende al 100% de fertilizantes sintéticos (fórmulas N-P-K y urea) y todo el manejo se orienta únicamente a la recolección estacional del grano.",
+            "concept_en": "Consists of cultivating solely coffee bushes in continuous rows with completely bare inter-rows maintained through regular chemical herbicide sprays, without any living covers or legumes; plant nutrition relies entirely on synthetic fertilizers, focusing exclusively on seasonal coffee cherry harvest.",
             "schedule": [
                 {"period_es": "Año 1-20+", "period_en": "Year 1-20+", "practice_es": "Café a pleno sol o sombra ligera sin cobertura", "practice_en": "Full-sun or low-shade coffee with bare alleys", "role_es": "Monocultivo continuo con uso intensivo de herbicidas y fertilizantes sintéticos", "role_en": "Continuous monoculture with heavy synthetic fertilizer and herbicide usage"}
             ],
@@ -217,6 +219,8 @@ MULTI_STRATEGY_CATALOG: Dict[str, List[Dict[str, Any]]] = {
             "tag_es": "Regeneración de Suelo & Biocontrol",
             "tag_en": "Soil Regeneration & Biocontrol",
             "primary_goal": "soil_health",
+            "concept_es": "Consiste en sembrar leguminosas herbáceas fijadoras de nitrógeno (Canavalia o frijol de cobertura) y abonos verdes biofumigantes (Crotalaria juncea) en las calles entre cafetos. Antes de florecer, se cortan y esparcen como acolchado orgánico (mulch), liberando nitrógeno atmosférico directamente a la zona radicular, reactivando lombrices y suprimiendo nemátodos parásitos sin competir con el cafeto.",
+            "concept_en": "Consists of planting nitrogen-fixing herbaceous legumes (Jack Bean / Canavalia) and biofumigant green manures (Crotalaria juncea) in alleyways between coffee rows. Prior to flowering, they are slashed and spread as organic mulch, releasing fixed atmospheric nitrogen directly into the root zone, reviving earthworms and suppressing nematodes without competing with coffee.",
             "schedule": [
                 {"period_es": "Año 1 (Entrada de lluvias)", "period_en": "Year 1 (Early rains)", "practice_es": "Poda de cafetos + Siembra de Canavalia en calles", "practice_en": "Coffee pruning + Inter-row Jack Bean seeding", "role_es": "Fijación biológica intensiva de nitrógeno y control de malezas agresivas", "role_en": "Intensive biological N fixation and aggressive weed suppression"},
                 {"period_es": "Año 1 (Canícula / Veranillo)", "period_en": "Year 1 (Midsummer drought)", "practice_es": "Corte de Canavalia y distribución como mulch", "practice_en": "Canavalia cutting and mulch distribution", "role_es": "Protección de humedad radicular monitoreada por SMAP y reducción térmica", "role_en": "Root-zone moisture protection monitored by SMAP and thermal buffering"},
@@ -266,6 +270,8 @@ MULTI_STRATEGY_CATALOG: Dict[str, List[Dict[str, Any]]] = {
             "tag_es": "Ingresos Suplementarios & Alimento",
             "tag_en": "Supplemental Income & Food Security",
             "primary_goal": "income",
+            "concept_es": "Consiste en aprovechar la luz y el espacio en calles amplias de cafetales podados o en renovación para sembrar hileras intercaladas de Frijol común de ciclo corto (65-75 días) y Maíz criollo. Genera alimentos e ingresos directos entre mayo y agosto (meses tradicionalmente sin cosecha de café), y aporta rastrojo rico en carbono para proteger el suelo en época lluviosa.",
+            "concept_en": "Consists of capitalizing on light and space in wide alleys of pruned or renovating coffee to intercrop short-cycle common beans (65-75 days) and native maize. Produces food and immediate cash flow between May and August (lean months with zero coffee harvest), supplying carbon-rich straw to armor topsoil during late rains.",
             "schedule": [
                 {"period_es": "Año 1 (Mayo-Agosto)", "period_en": "Year 1 (May-Aug)", "practice_es": "Siembra de Frijol común de ciclo corto (65 días) en calles amplias", "practice_en": "Short-cycle common bean (65 days) intercropped in wide alleys", "role_es": "Cosecha de grano para autoconsumo familiar o venta directa en feria", "role_en": "Grain harvest for farm household food security or local farmers market sales"},
                 {"period_es": "Año 1 (Setiembre-Nov)", "period_en": "Year 1 (Sep-Nov)", "practice_es": "Siembra de Maíz criollo de porte medio", "practice_en": "Medium-stature native maize planting", "role_es": "Ingreso extra por elote tierno y aporte de rastrojo alto en carbono", "role_en": "Extra revenue from sweet corn and high-carbon crop residue generation"},
@@ -314,6 +320,8 @@ MULTI_STRATEGY_CATALOG: Dict[str, List[Dict[str, Any]]] = {
             "tag_es": "Retención Hídrica & Laderas Seguras",
             "tag_en": "Water Retention & Slope Protection",
             "primary_goal": "erosion_control",
+            "concept_es": "Consiste en establecer un tapete vegetal perenne y rastrero de Maní Forrajero (Arachis pintoi) en el piso del cafetal, complementado con barreras vivas de Zacate Vetiver en curvas a nivel en laderas. El maní forma un colchón denso de 10-15 cm que no trepa al cafeto, enfría el suelo en 3-5°C en verano, frena la escorrentía torrencial y fija nitrógeno año tras año sin necesidad de resembrar.",
+            "concept_en": "Consists of establishing a permanent living carpet of Forage Peanut (Arachis pintoi) across the orchard floor, combined with contour-planted Vetiver grass barriers on hillsides. The peanut creates a dense 10-15 cm mat that never climbs coffee bushes, cools soil by 3-5°C in dry months, curbs torrential runoff, and fixes nitrogen continuously without replanting.",
             "schedule": [
                 {"period_es": "Establecimiento", "period_en": "Establishment", "practice_es": "Siembra en calles de Maní Forrajero perenne (Arachis pintoi)", "practice_en": "Inter-row planting of perennial Forage Peanut (Arachis pintoi)", "role_es": "Manto vivo permanente que no compite con las raíces profundas del café", "role_en": "Permanent living mat that does not compete with deeper coffee taproots"},
                 {"period_es": "Bordes & Curvas de nivel", "period_en": "Borders & Contours", "practice_es": "Barreras vivas de Zacate Vetiver en curvas a nivel SRTM", "practice_en": "Living Vetiver barriers planted along SRTM contour lines", "role_es": "Frenado de la escorrentía torrencial y fijación mecánica del terreno", "role_en": "Torrents energy dissipation and mechanical soil anchorage"},
@@ -365,6 +373,8 @@ MULTI_STRATEGY_CATALOG: Dict[str, List[Dict[str, Any]]] = {
             "tag_es": "Práctica Existente / Monocultivo Continuo",
             "tag_en": "Existing Practice / Continuous Monoculture",
             "primary_goal": "income",
+            "concept_es": "Consiste en mantener plantaciones continuas de banano durante 10 a 20 años sin ninguna rotación de cultivos, sustentadas en rebrotes continuos (hijos/socas), con aplicaciones sistemáticas de nematicidas químicos al suelo y aspersión aérea de fungicidas contra Sigatoka Negra. Las calles sufren compactación severa por el tránsito de cuadrillas de cosecha.",
+            "concept_en": "Consists of maintaining unbroken monoculture banana stands for 10 to 20 years without crop rotation, relying on continuous ratoon suckers, synthetic soil nematicides, and aerial fungicide spraying against Black Sigatoka. Inter-rows suffer heavy foot and tractor compaction.",
             "schedule": [
                 {"period_es": "Año 1-15+", "period_en": "Year 1-15+", "practice_es": "Banano intensivo en monocultivo permanente", "practice_en": "Intensive permanent monoculture banana", "role_es": "Alta extracción de nutrientes, compactación por cuadrillas y fumigación aérea constante", "role_en": "High nutrient export, foot-traffic compaction, and continuous aerial fungicide spraying"}
             ],
@@ -411,6 +421,8 @@ MULTI_STRATEGY_CATALOG: Dict[str, List[Dict[str, Any]]] = {
             "tag_es": "Saneamiento de Nemátodos & Fusarium",
             "tag_en": "Nematode Sanitization & Fusarium Control",
             "primary_goal": "pest_control",
+            "concept_es": "Consiste en realizar una pausa de saneamiento biológico de 6 a 8 meses al renovar un lote de banano agotado: se trituran las cepas viejas y se siembra de inmediato Crotalaria juncea y Mucuna pruriens. Las raíces de la crotalaria segregan alcaloides que matan por inanición a los nemátodos barrenadores (Radopholus similis), y la mucuna aporta más de 8 t/ha de biomasa rica en nitrógeno antes de sembrar cormos saneados.",
+            "concept_en": "Consists of a 6 to 8-month biological sanitation pause when renewing exhausted banana plots: old pseudostems are shredded, followed immediately by dense seeding of Crotalaria juncea and Mucuna pruriens. Crotalaria alkaloids starve out burrowing nematodes (Radopholus similis), and mucuna supplies over 8 t/ha of nitrogen-rich organic biomass before planting clean corms.",
             "schedule": [
                 {"period_es": "Mes 1-3", "period_en": "Month 1-3", "practice_es": "Trituración de cepas viejas + Siembra densa de Crotalaria juncea", "practice_en": "Old pseudostem shredding + Dense Crotalaria juncea seeding", "role_es": "Biofumigación radical que colapsa poblaciones de Radopholus similis", "role_en": "Radical biofumigation collapsing Radopholus similis nematode loads"},
                 {"period_es": "Mes 4-6", "period_en": "Month 4-6", "practice_es": "Incorporación de biomasa + Siembra de Mucuna pruriens", "practice_en": "Biomass incorporation + Velvet Bean (Mucuna) planting", "role_es": "Inyección masiva de nitrógeno orgánico y supresión de malezas", "role_en": "Massive injection of organic N and total smothering of weeds"},
@@ -459,6 +471,8 @@ MULTI_STRATEGY_CATALOG: Dict[str, List[Dict[str, Any]]] = {
             "tag_es": "Rastrojo Voluminoso & Alimentación Animal",
             "tag_en": "Heavy Residue & Livestock Feed",
             "primary_goal": "income",
+            "concept_es": "Consiste en rotar el terreno de banano renovado con un ciclo rápido (3-4 meses) de Maíz o Sorgo Forrajero de alto porte. Sus raíces fasciculadas rompen las capas compactadas por tractores, interrumpen la bacteria del Moko (Ralstonia solanacearum) y producen de 20 a 35 t/ha de forraje verde para alimentación de ganado bovino, porcino o aves.",
+            "concept_en": "Consists of rotating renewed banana land with a fast 3 to 4-month cycle of high-biomass forage maize or sorghum. Deep fibrous root systems fracture tractor compaction tracks, interrupt Ralstonia solanacearum (Moko disease) bacteria, and yield 20 to 35 t/ha of high-energy silage for local livestock.",
             "schedule": [
                 {"period_es": "Fase 1 (4 meses)", "period_en": "Phase 1 (4 months)", "practice_es": "Rotación con Maíz o Sorgo Forrajero de alto porte", "practice_en": "Rotation with high-biomass Maize or Forage Sorghum", "role_es": "Corte para ensilaje animal de alta energía o cosecha de grano", "role_en": "Harvest for high-energy silage or grain cash crop"},
                 {"period_es": "Fase 2 (2 meses)", "practice_es": "Incorporación de rastrojo fibroso con rastra ligera", "practice_en": "Fibrous residue incorporation with light disk harrow", "period_en": "Phase 2 (2 months)", "role_es": "Descompactación de huellas de maquinaria y aireación del suelo aluvial", "role_en": "Alleviation of equipment compaction tracks and alluvial soil aeration"},
@@ -505,6 +519,8 @@ MULTI_STRATEGY_CATALOG: Dict[str, List[Dict[str, Any]]] = {
             "tag_es": "Protección contra Inundaciones & Anegamiento",
             "tag_en": "Flood Protection & Soil Armor",
             "primary_goal": "water_conservation",
+            "concept_es": "Consiste en tapizar las orillas y taludes de la red de canales de drenaje con Maní Forrajero (Arachis pintoi) y pastos humícolas (Brachiaria humidicola). Crea una geomalla viva de raíces entrelazadas que evita el derrumbe de los canales por aguaceros tropicales, impidiendo que los drenajes se aterren y asegurando una evacuación rápida del exceso de agua.",
+            "concept_en": "Consists of carpeting drainage canal embankments and ditch shoulders with living Forage Peanut (Arachis pintoi) and flood-tolerant Brachiaria humidicola. Forms a living root geogrid that stops canal bank slumping during Caribbean tropical downpours, ensuring rapid flood drainage without waterlogging banana roots.",
             "schedule": [
                 {"period_es": "Permanente", "period_en": "Permanent", "practice_es": "Maní forrajero rastrero establecido en canales y calles de drenaje", "practice_en": "Trailing Forage Peanut established on ditch banks and pathways", "role_es": "Estabilización de bordes de canales de drenaje frente al oleaje de escorrentía", "role_en": "Stabilizing drainage ditch banks against scouring and slumping"},
                 {"period_es": "Inter-ciclo", "period_en": "Inter-cycle", "practice_es": "Pastos de corte de raíz profunda (Brachiaria humidicola)", "practice_en": "Deep-rooting tropical grass fallow (Brachiaria humidicola)", "role_es": "Lavado biológico de sales y descompactación profunda", "role_en": "Biological leaching of residual salts and subsoil loosening"},
@@ -553,6 +569,8 @@ MULTI_STRATEGY_CATALOG: Dict[str, List[Dict[str, Any]]] = {
             "tag_es": "Práctica Existente / Monocultivo Continuo",
             "tag_en": "Existing Practice / Continuous Monoculture",
             "primary_goal": "income",
+            "concept_es": "Consiste en sembrar caña de azúcar seguida de 4 a 6 cortes anuales consecutivos con quema previa del cañaveral antes de la zafra. La quema destruye la materia orgánica y deja el suelo completamente desnudo y calcinado durante los meses más calurosos y secos de Guanacaste (febrero a abril), acelerando la erosión eólica y la pérdida de agua.",
+            "concept_en": "Consists of planting sugar cane followed by 4 to 6 consecutive annual ratoon harvests with pre-harvest burning. Field burning destroys organic matter and leaves soil bare and scorched during Guanacaste's hottest dry months (Feb-Apr), accelerating wind erosion and moisture loss.",
             "schedule": [
                 {"period_es": "Año 1-5", "period_en": "Year 1-5", "practice_es": "Plantilla inicial seguida de 4 a 6 socas consecutivas con quema", "practice_en": "Plant cane followed by 4 to 6 consecutive burned ratoons", "role_es": "Cosecha intensiva con quema previa y desprotección total del suelo post-zafra", "role_en": "Intensive harvest with pre-burn and complete soil bare exposure post-harvest"}
             ],
@@ -599,6 +617,8 @@ MULTI_STRATEGY_CATALOG: Dict[str, List[Dict[str, Any]]] = {
             "tag_es": "Fijación de N & Corte de Fatiga",
             "tag_en": "N Fixation & Soil Rest",
             "primary_goal": "soil_health",
+            "concept_es": "Consiste en aprovechar la ventana de descanso de 75 a 90 días entre el último corte de caña vieja y la siembra de la nueva plantilla para sembrar leguminosas resistentes al calor como Frijol Caupí o Soya temprana. Fija hasta 80 kg N/ha con las primeras lluvias y se incorpora con un subsolador ecológico, cortando la fatiga del suelo y abonando la nueva caña.",
+            "concept_en": "Consists of utilizing the 75 to 90-day window between final ratoon harvest and new cane planting to sow drought-tolerant legumes like Cowpea or early Soy. Biologically fixes up to 80 kg N/ha with early rains and is subsoiled into the root zone, curing soil sickness and pre-fertilizing the new crop.",
             "schedule": [
                 {"period_es": "Entrezafra (Mes 1-3)", "period_en": "Post-harvest window (Mo 1-3)", "practice_es": "Siembra inmediata de Frijol Caupí o Soya de 75-90 días", "practice_en": "Immediate seeding of Cowpea or short-cycle 75-90d Soy", "role_es": "Aprovechamiento de primeras lluvias para fijar 60-80 kg N/ha", "role_en": "Utilizing early rains to biologically fix 60-80 kg N/ha"},
                 {"period_es": "Pre-siembra (Mes 4)", "period_en": "Pre-planting (Mo 4)", "practice_es": "Incorporación de la biomasa con subsolador ecológico", "practice_en": "Biomass incorporation with ecological subsoiler", "role_es": "Descompactación profunda y suministro de nitrógeno asimilable", "role_en": "Deep subsoiling and plant-available N release"},
@@ -645,6 +665,8 @@ MULTI_STRATEGY_CATALOG: Dict[str, List[Dict[str, Any]]] = {
             "tag_es": "Monetización del Barbecho & Descompactación",
             "tag_en": "Fallow Monetization & Decompaction",
             "primary_goal": "income",
+            "concept_es": "Consiste en rotar un año completo de cañaveral agotado con el cultivo tecnificado de tubérculos comerciales como Yuca Valencia o Camote. Las raíces tuberosas penetran y agrietan las capas de arcilla compactada hasta 45 cm de profundidad sin voltear el suelo, rompen el banco de malezas gramíneas y generan ingresos de exportación de hasta $5,000/ha.",
+            "concept_en": "Consists of rotating an exhausted sugar parcel for one full year with export root tubers such as Cassava or Sweet Potato. Expanding tubers naturally fracture compacted clay subsoils down to 45 cm without destructive tillage, break resistant grass weeds, and generate export revenue up to $5,000/ha.",
             "schedule": [
                 {"period_es": "Año 1", "period_en": "Year 1", "practice_es": "Destrucción de cepas viejas + Siembra de Yuca Valencia", "practice_en": "Old cane destruction + Export-grade Cassava planting", "role_es": "Cosecha de 18-25 t/ha de raíces comerciales y rotura de suelo", "role_en": "Harvesting 18-25 t/ha of export roots and breaking plow pans"},
                 {"period_es": "Año 2-5", "period_en": "Year 2-5", "practice_es": "Siembra de Caña de Azúcar en suelo restaurado", "practice_en": "Sugar Cane establishment on structurally restored soils", "role_es": "Cañaveral limpio de malezas gramíneas resistentes", "role_en": "Cane stand free from resistant noxious grass weeds"},
@@ -690,6 +712,8 @@ MULTI_STRATEGY_CATALOG: Dict[str, List[Dict[str, Any]]] = {
             "tag_es": "Ahorro de Agua & Crotalaria de Cobertura",
             "tag_en": "Water Conservation & Sunn Hemp Cover",
             "primary_goal": "water_conservation",
+            "concept_es": "Consiste en cosechar la caña en verde (sin quema mecánica ni manual), triturando y esparciendo las hojas y puntas en un colchón protector de 8 a 12 t/ha de paja sobre el suelo. En hileras alternas se intercala Crotalaria ochroleuca, logrando un microclima fresco que reduce 7°C la temperatura del suelo y ahorra hasta 3 turnos de riego en verano.",
+            "concept_en": "Consists of green cane harvesting without field burning, shredding and spreading leaves as an 8 to 12 t/ha protective mulch blanket across the ground. Inter-row intercropping with Crotalaria ochroleuca creates a buffered microclimate that cools topsoil by 7°C and saves up to 3 irrigation rounds.",
             "schedule": [
                 {"period_es": "Post-Cosecha Verde", "period_en": "Post Green Harvest", "practice_es": "Cosecha en verde (sin quema) + acolchado con rastrojo de caña", "practice_en": "Green harvest (no burning) + thick trash blanketing", "role_es": "Cobertura de 8-12 t/ha de rastrojo que reduce evaporación en 45%", "role_en": "8-12 t/ha trash mulch reducing evaporation by 45%"},
                 {"period_es": "Temporada de Lluvias", "period_en": "Rainy Season", "practice_es": "Siembra en hileras alternas de Crotalaria ochroleuca", "practice_en": "Alternate-row intercropping of Crotalaria ochroleuca", "role_es": "Fijación biológica de N e incremento de infiltración de lluvias GPM", "role_en": "Biological N fixation and accelerated GPM rainfall infiltration"},
@@ -738,6 +762,8 @@ MULTI_STRATEGY_CATALOG: Dict[str, List[Dict[str, Any]]] = {
             "tag_es": "Práctica Existente / Monocultivo Continuo",
             "tag_en": "Existing Practice / Continuous Monoculture",
             "primary_goal": "income",
+            "concept_es": "Consiste en monocultivos continuos de piña fresca MD2 con desinfección química intensa del suelo y uso recurrente de herbicidas. Tras la cosecha, el inmenso volumen de rastrojo ácido residual se deseca químicamente con paraquat o se tritura con maquinaria pesada, provocando acidez extrema, proliferación de mosca del establo y compactación en Ultisoles.",
+            "concept_en": "Consists of continuous fresh MD2 pineapple monoculture with intensive chemical soil fumigation and herbicides. After harvest, massive acidic crop stubble is chemically burned or pulverized, causing extreme acidification, stable fly outbreaks, and compaction in fragile Ultisols.",
             "schedule": [
                 {"period_es": "Año 1-3", "period_en": "Year 1-3", "practice_es": "Cosecha inicial y cosecha inducida continua en monocultivo", "practice_en": "Plant crop and induced ratoon in continuous monoculture", "role_es": "Uso intensivo de herbicidas, desinfección química de suelo y rastreo profundo", "role_en": "Intensive herbicide applications, chemical soil fumigation, and deep tillage"}
             ],
@@ -784,6 +810,8 @@ MULTI_STRATEGY_CATALOG: Dict[str, List[Dict[str, Any]]] = {
             "tag_es": "Supresión de Sinfilidos & Nemátodos",
             "tag_en": "Symphylid & Nematode Suppression",
             "primary_goal": "pest_control",
+            "concept_es": "Consiste en aplicar enmiendas de cal al rastrojo triturado y sembrar de inmediato un cultivo denso de Crotalaria juncea durante 90 a 120 días. Sus exudados radiculares bioactivos suprimen naturalmente las poblaciones de sinfilidos (Scutigerella) y nemátodos sin aplicar químicos peligrosos, aportando además 12 t/ha de materia orgánica que neutraliza la acidez.",
+            "concept_en": "Consists of applying agricultural lime to shredded stubble followed by a dense 90 to 120-day Crotalaria juncea biofumigant cover crop. Bioactive root exudates suppress symphylids (Scutigerella) and nematodes without hazardous chemicals, supplying 12 t/ha of organic matter to buffer soil acidity.",
             "schedule": [
                 {"period_es": "Mes 1-2", "period_en": "Month 1-2", "practice_es": "Trituración mecánica de rastrojo de piña + cal agrícola para corregir pH", "practice_en": "Mechanical shredding of pineapple stubble + agricultural lime", "role_es": "Aceleración de descomposición bacteriana del rastrojo ácido", "role_en": "Accelerating bacterial decomposition of acidic pineapple residues"},
                 {"period_es": "Mes 3-5", "period_en": "Month 3-5", "practice_es": "Siembra densa de Crotalaria juncea (40 kg semilla/ha)", "practice_en": "Dense seeding of Crotalaria juncea (40 kg seed/ha)", "role_es": "Biofumigación que erradica sinfilidos y nemátodos parásitos", "role_en": "Biofumigation suppressing symphylids and root-knot nematodes"},
@@ -831,6 +859,8 @@ MULTI_STRATEGY_CATALOG: Dict[str, List[Dict[str, Any]]] = {
             "tag_es": "Diversificación de Mercado & Descompactación",
             "tag_en": "Market Diversification & Deep Rooting",
             "primary_goal": "income",
+            "concept_es": "Consiste en intercalar un ciclo comercial de Yuca Valencia de exportación (10 meses) entre dos ciclos de piña, seguido de un abono verde de frijol Canavalia. Esta rotación rompe las plagas específicas de las bromeliáceas, aprovecha la fertilidad residual de las camas de piña y descompacta biológicamente el suelo antes de la siguiente siembra.",
+            "concept_en": "Consists of interspersing a commercial 10-month export Cassava crop between pineapple cycles, followed by a short Jack Bean cover crop. Breaks bromeliad-specific pests, leverages residual fertility from pineapple beds, and biologically decompresses soil prior to new planting.",
             "schedule": [
                 {"period_es": "Año 1", "period_en": "Year 1", "practice_es": "Cosecha final de piña + Siembra de Yuca Valencia", "practice_en": "Final pineapple harvest + Export Cassava planting", "role_es": "Generación de ingresos exportables y rotura natural de suelas de arado", "role_en": "Generating export revenue and naturally breaking plow pans"},
                 {"period_es": "Año 2 (Mes 1-3)", "period_en": "Year 2 (Month 1-3)", "practice_es": "Post-cosecha de yuca + Barbecho corto con Frijol Canavalia", "practice_en": "Post-cassava harvest + Short Jack Bean cover crop", "role_es": "Recuperación de nitrógeno y cobertura del suelo en época lluviosa", "role_en": "Nitrogen recovery and complete soil canopy armor in wet months"},
@@ -877,6 +907,8 @@ MULTI_STRATEGY_CATALOG: Dict[str, List[Dict[str, Any]]] = {
             "tag_es": "Infiltración Hídrica & Control de Erosión",
             "tag_en": "Water Infiltration & Erosion Shield",
             "primary_goal": "erosion_control",
+            "concept_es": "Consiste en sembrar un descanso biológico de 12 a 18 meses con pasto forrajero perenne (Brachiaria brizantha) tras finalizar el ciclo de piña. La red de raíces del pasto penetra hasta 1.5 metros, reconstruyendo los agregados del suelo destruidos por el arado, frenando la erosión de las lluvias torrenciales de la Zona Norte y permitiendo obtener renta ganadera.",
+            "concept_en": "Consists of a 12 to 18-month restorative grass fallow with Brachiaria brizantha after pineapple harvest. Fibrous grass roots down to 1.5m rebuild degraded soil aggregates, halt erosion from Northern Costa Rica's torrential rains, and provide supplemental cattle grazing returns.",
             "schedule": [
                 {"period_es": "Año 1", "period_en": "Year 1", "practice_es": "Siembra de Brachiaria brizantha o brizantha híbrida", "practice_en": "Brachiaria brizantha or hybrid tropical grass seeding", "role_es": "Cobertura densa inmediata que frena la escorrentía torrencial", "role_en": "Dense living carpet immediately dissipating runoff energy"},
                 {"period_es": "Año 1 (Intermedio)", "period_en": "Year 1 (Mid-cycle)", "practice_es": "Aprovechamiento con pastoreo controlado de terneros o corte de heno", "practice_en": "Managed rotational calf grazing or hay-making", "role_es": "Renta ganadera secundaria y reciclaje acelerado de nutrientes vía bosta", "role_en": "Secondary cattle income and accelerated manure nutrient cycling"},
@@ -926,6 +958,8 @@ MULTI_STRATEGY_CATALOG: Dict[str, List[Dict[str, Any]]] = {
             "tag_es": "Práctica Existente / Monocultivo Continuo",
             "tag_en": "Existing Practice / Continuous Monoculture",
             "primary_goal": "income",
+            "concept_es": "Consiste en mantener el huerto de aguacateros con el suelo debajo de la copa y entre las calles totalmente limpio y descubierto mediante herbicidas químicos. Expone las raíces absorbentes del árbol al calentamiento solar en verano (>32°C) y facilita que las salpicaduras de lluvia torrencial dispersen las esporas de la Tristeza del Aguacate (Phytophthora cinnamomi).",
+            "concept_en": "Consists of maintaining avocado orchards with completely bare, herbicide-cleared ground under the canopy and across alleys. Exposes shallow roots to extreme solar heating (>32°C) and allows torrential rain splash to spread Phytophthora cinnamomi root rot spores.",
             "schedule": [
                 {"period_es": "Permanente", "period_en": "Permanent", "practice_es": "Huerto con calles limpiadas con herbicidas (suelo desnudo)", "practice_en": "Orchard with herbicide-cleared bare-soil inter-rows", "role_es": "Monocultivo continuo con alta exposición del plato radicular a calor y lluvia", "role_en": "Continuous monoculture exposing feeder roots to direct heat and torrential impact"}
             ],
@@ -972,6 +1006,8 @@ MULTI_STRATEGY_CATALOG: Dict[str, List[Dict[str, Any]]] = {
             "tag_es": "Supresión Biológica de Tristeza & Fijación de N",
             "tag_en": "Phytophthora Suppression & N Fixation",
             "primary_goal": "soil_health",
+            "concept_es": "Consiste en sembrar un manto vivo perenne de Maní Forrajero (Arachis pintoi) en las calles y hasta 30 cm del tronco del aguacate. Esta leguminosa rastrera no trepa al árbol y estimula en su rizósfera bacterias y hongos benéficos (Trichoderma) que atacan y neutralizan a Phytophthora cinnamomi, reduciendo además 4°C la temperatura del suelo en verano.",
+            "concept_en": "Consists of establishing a permanent living groundcover of Forage Peanut (Arachis pintoi) across orchard alleys up to 30 cm from tree trunks. Stimulates beneficial biocontrol microbes (Trichoderma) that suppress Phytophthora cinnamomi, stabilizes soil moisture, and cools ground temperature by 4°C.",
             "schedule": [
                 {"period_es": "Año 1", "period_en": "Year 1", "practice_es": "Siembra de Maní Forrajero (Arachis pintoi) en calles y entre-árboles", "practice_en": "Forage Peanut establishment across inter-rows and between trees", "role_es": "Creación de un tapete denso que suprime malezas y compite contra Phytophthora", "role_en": "Dense botanical carpet suppressing weeds and competing against Phytophthora"},
                 {"period_es": "Permanente", "period_en": "Permanent", "practice_es": "Mantenimiento con motoguadaña 2 veces al año descargando el rastrojo al plato", "practice_en": "Bi-annual brushcutting directing organic cuttings towards the tree dripline", "role_es": "Alimentación continua de micorrizas y aporte de nitrógeno orgánico", "role_en": "Continuous mycorrhizal feeding and biological N supplementation"},
@@ -1017,6 +1053,8 @@ MULTI_STRATEGY_CATALOG: Dict[str, List[Dict[str, Any]]] = {
             "tag_es": "Flujo de Caja Inmediato & Seguridad Alimentaria",
             "tag_en": "Immediate Cash Flow & Food Security",
             "primary_goal": "income",
+            "concept_es": "Consiste en aprovechar los primeros 3 años del huerto (mientras los árboles crecen y aún no producen fruta) para cultivar las calles anchas (6 a 7 metros) con hileras intercaladas de Frijol de grano y Maíz criollo. Proporciona cosechas comerciales inmediatas para financiar los costos de mantenimiento de la finca y genera rastrojo para acolchar el plato de los árboles.",
+            "concept_en": "Consists of capitalizing on the first 3 non-bearing years of the young orchard to cultivate wide 6-7 meter alleys with intercropped rows of edible beans and native maize. Provides immediate grain harvests to finance farm labor and establishment expenses while generating straw mulch for young tree driplines.",
             "schedule": [
                 {"period_es": "Años 1-3 (Mayo-Agosto)", "period_en": "Years 1-3 (May-Aug)", "practice_es": "Siembra de Frijol de grano en calles anchas (6 metros de espacio)", "practice_en": "Grain bean cultivation in wide 6-meter orchard alleys", "role_es": "Aporte de cosechas comerciales mientras los aguacateros crecen sin producir", "role_en": "Commercial grain crops generating income while avocado trees mature"},
                 {"period_es": "Años 1-3 (Set-Nov)", "period_en": "Years 1-3 (Sep-Nov)", "practice_es": "Siembra de Maíz criollo de porte bajo", "practice_en": "Low-stature native maize planting", "role_es": "Ingreso extra por grano y mulch para acolchar el plato del árbol", "role_en": "Extra grain cash and heavy straw mulch for young tree root zones"},
@@ -1063,6 +1101,8 @@ MULTI_STRATEGY_CATALOG: Dict[str, List[Dict[str, Any]]] = {
             "tag_es": "Rompevientos & Raíces Descompactadoras",
             "tag_en": "Windbreak Protection & Drought Shield",
             "primary_goal": "water_conservation",
+            "concept_es": "Consiste en plantar cortinas rompevientos agroforestales perimetrales con arbustos de Gandul (Cajanus cajan) y barreras vivas de Zacate Vetiver. Frena los vientos alisios secos de diciembre a marzo que provocan la caída de flores del aguacate, aporta grano comestible proteico para la familia rural y sus podas generan acolchado rico en fósforo.",
+            "concept_en": "Consists of planting perimeter and contour agroforestry windbreaks with Pigeon Pea (Cajanus cajan) shrubs and Vetiver grass. Buffers dry trade winds from Dec to March that dehydrate canopies and cause flower drop, yields nutritious edible grain, and supplies regular prunings rich in bioavailable phosphorus.",
             "schedule": [
                 {"period_es": "Perímetro & Borde", "period_en": "Perimeter & Edges", "practice_es": "Cortinas rompevientos de Gandul (Cajanus cajan) y Vetiver", "practice_en": "Pigeon Pea (Cajanus cajan) and Vetiver living windbreaks", "role_es": "Frenado de vientos alisios desecantes que causan caída prematura de flores", "role_en": "Dissipating drying trade winds that cause premature flower and fruitlet drop"},
                 {"period_es": "Calles Interiores", "period_en": "Inner Alleys", "practice_es": "Poda periódica de gandul para biomasa y aporte de fósforo al suelo", "practice_en": "Periodic lopping of pigeon pea for biomass and soil phosphorus release", "role_es": "Acolchado perimetral contra la evaporación de verano", "role_en": "Deep root mulch protecting topsoil from dry season desiccation"},
