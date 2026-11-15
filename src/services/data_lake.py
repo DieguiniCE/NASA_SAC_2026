@@ -16,6 +16,7 @@ from src.services.gpm_service import GPMService
 from src.services.ecostress_service import ECOSTRESSService
 from src.services.srtm_service import SRTMService
 from src.services.imn_cr_service import IMNCostaRicaService
+from src.services.land_verification import validate_terrestrial_location
 from src.data.costa_rica_locations import find_closest_location
 
 
@@ -24,13 +25,14 @@ def get_unified_environmental_profile(lat: float, lon: float) -> Dict[str, Any]:
     Synthesizes multi-mission satellite and local institutional databases into
     a single comprehensive environmental profile for a location in Costa Rica.
     """
-    # 1. Base Climatology from NASA POWER
+    # 1. Base Climatology from NASA POWER & Terrestrial Verification
+    val = validate_terrestrial_location(lat, lon)
+    closest_loc = val["closest_land_location"]
     nasa_power_data = fetch_nasa_power_climatology(lat, lon)
     annual_sum = nasa_power_data.get("annual_summary", {})
     air_temp_c = annual_sum.get("mean_temp_c", 22.0)
     annual_precip_mm = annual_sum.get("annual_precipitation_mm", 2200.0)
     air_humidity_pct = annual_sum.get("mean_relative_humidity", 78.0)
-    closest_loc = find_closest_location(lat, lon)
     elev_init = nasa_power_data.get("elevation_m") or closest_loc.get("elevation_m", 1000)
 
     # 2. NASA SRTM 30m Global Topography
@@ -89,6 +91,8 @@ def get_unified_environmental_profile(lat: float, lon: float) -> Dict[str, Any]:
             "canton": closest_loc["canton"],
             "province": closest_loc["province"],
             "imn_region": imn_data["imn_climate_region"],
+            "is_terrestrial_land": val["is_valid"],
+            "land_classification": val["classification_es"],
         },
         "temperatures": {
             "air_temperature_mean_c": air_temp_c,

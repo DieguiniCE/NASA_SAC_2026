@@ -235,6 +235,20 @@ TRANSLATIONS = {
     "metric_slope":     {"es": "Pendiente",  "en": "Slope"},
     "metric_peak":      {"es": "Pico",       "en": "Peak"},
     "metric_absorption":{"es": "Absorción",  "en": "Absorption"},
+
+    # ── Land Verification ─────────────────────────────────────────────────────
+    "sea_warning_title": {"es": "🌊 Zona Marina / No Apta para Cultivo",
+                          "en": "🌊 Marine / Non-Arable Zone"},
+    "sea_warning_desc":  {"es": "El punto seleccionado se ubica en el mar o aguas no continentales. AgroClima evalúa exclusivamente terrenos agrícolas terrestres de Costa Rica.",
+                          "en": "The selected point is located in the sea or non-mainland waters. AgroClima exclusively evaluates terrestrial agricultural land in Costa Rica."},
+    "sea_closest_hint":  {"es": "Punto continental más cercano",
+                          "en": "Closest mainland point"},
+    "snap_to_land_btn":  {"es": "📍 Fijar en tierra firme más cercana",
+                          "en": "📍 Snap to closest land"},
+    "ocean_invalid_coords": {"es": "Coordenadas en el mar o fuera de Costa Rica continental. Por favor, ingrese un punto terrestre.",
+                             "en": "Coordinates are in the ocean or outside mainland Costa Rica. Please enter a land point."},
+    "layer_cr_boundary": {"es": "Zona Terrestre Agrícola (Costa Rica)",
+                          "en": "Arable Terrestrial Zone (Costa Rica)"},
 }
 
 

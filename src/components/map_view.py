@@ -1,4 +1,4 @@
-"""Folium map component for Costa Rica interactive selection."""
+"""Folium map component for Costa Rica interactive selection with terrestrial boundary validation."""
 
 import folium
 from streamlit_folium import st_folium
@@ -7,6 +7,7 @@ from typing import Tuple, Optional, Dict, Any
 
 from src.config import COSTA_RICA_CENTER, DEFAULT_ZOOM, CR_LAT_MIN, CR_LAT_MAX, CR_LON_MIN, CR_LON_MAX
 from src.data.costa_rica_locations import get_all_locations, find_closest_location
+from src.services.land_verification import CR_MAINLAND_POLYGON, validate_terrestrial_location
 
 
 def render_costa_rica_map(
@@ -15,10 +16,12 @@ def render_costa_rica_map(
     location_name: str = "Punto Seleccionado",
     elevation_m: Optional[int] = None,
     show_reference_zones: bool = True,
+    rejected_coord: Optional[Tuple[float, float, str]] = None,
     map_height: int = 500
 ) -> Optional[Tuple[float, float]]:
     """
     Renders an interactive Folium map centered on Costa Rica.
+    Draws the official terrestrial agricultural boundary of Costa Rica.
     Captures click / touch events and returns (lat, lon) if a click occurred.
     """
     # Create Folium Map
@@ -37,6 +40,19 @@ def render_costa_rica_map(
         name="Satélite (Esri)",
     ).add_to(m)
 
+    # Add official Terrestrial Agricultural Boundary of Costa Rica
+    folium.Polygon(
+        locations=CR_MAINLAND_POLYGON,
+        color="#2E7D32",
+        weight=2.5,
+        dash_array="4, 4",
+        fill=True,
+        fill_color="#4CAF50",
+        fill_opacity=0.08,
+        tooltip="Zona Continental Agrícola de Costa Rica (Área Apta para Análisis)",
+        name="Límite Continental Terrestre (CR)",
+    ).add_to(m)
+
     # Optional: Display agricultural reference zones with tooltips
     if show_reference_zones:
         all_locs = get_all_locations()
@@ -53,7 +69,27 @@ def render_costa_rica_map(
                 tooltip=folium.Tooltip(tooltip_html),
             ).add_to(m)
 
-    # Add Selected Point Marker with a distinctive pulsing/red pin
+    # If an ocean / non-terrestrial point was recently clicked, display a warning marker
+    if rejected_coord:
+        r_lat, r_lon, r_label = rejected_coord
+        popup_ocean = f"""
+        <div style="font-family: Arial, sans-serif; min-width: 170px;">
+            <h4 style="margin: 0 0 4px 0; color: #D32F2F;">⚠️ {r_label}</h4>
+            <p style="margin: 2px 0; font-size: 11px;"><b>Lat:</b> {r_lat:.4f}° · <b>Lon:</b> {r_lon:.4f}°</p>
+            <p style="margin: 4px 0 0 0; color: #721C24; font-size: 11px;">
+                <b>Zona marítima no apta para cultivo.</b><br>
+                Haga clic sobre tierra firme dentro del polígono verde.
+            </p>
+        </div>
+        """
+        folium.Marker(
+            location=[r_lat, r_lon],
+            popup=folium.Popup(popup_ocean, max_width=240),
+            tooltip=f"⚠️ {r_label}: Zona marina no analizable",
+            icon=folium.Icon(color="blue", icon="water", prefix="fa"),
+        ).add_to(m)
+
+    # Add Selected Point Marker with a distinctive pulsing/green-red pin
     elev_text = f"{elevation_m} msnm" if elevation_m is not None else "Calculando..."
     popup_html = f"""
     <div style="font-family: Arial, sans-serif; min-width: 170px;">
@@ -61,7 +97,9 @@ def render_costa_rica_map(
         <p style="margin: 2px 0;"><b>Lat:</b> {selected_lat:.4f}°</p>
         <p style="margin: 2px 0;"><b>Lon:</b> {selected_lon:.4f}°</p>
         <p style="margin: 2px 0;"><b>Elevación:</b> {elev_text}</p>
-        <p style="margin: 4px 0 0 0; color: #555; font-size: 11px;">Coordenadas activas para datos NASA POWER</p>
+        <p style="margin: 4px 0 0 0; color: #2E7D32; font-size: 11px; font-weight: bold;">
+            ✓ Terreno Agrícola Válido (NASA · IMN)
+        </p>
     </div>
     """
     folium.Marker(

@@ -13,6 +13,7 @@ from src.config import (
     CR_LAT_MIN, CR_LAT_MAX, CR_LON_MIN, CR_LON_MAX,
 )
 from src.data.costa_rica_locations import find_closest_location
+from src.services.land_verification import validate_terrestrial_location
 from src.data.crops_catalog import CROPS_LIST
 from src.services.data_lake import get_unified_environmental_profile
 from src.models.sensitivity_viability_model import SensitivityViabilityModel
@@ -490,23 +491,70 @@ def main():
             st.markdown(f"<div class='section-title'>{t('map_title')}</div>", unsafe_allow_html=True)
             st.caption(t("map_caption"))
 
+            # Display error/warning notice if the user attempted to select sea/ocean
+            if st.session_state.get("geo_error"):
+                st.markdown(f"""
+                <div style="background:{'#261B14' if dark_mode else '#FFF3E0'}; border:1.5px solid #E65100; border-radius:8px; padding:12px 14px; margin-bottom:12px;">
+                    <div style="font-weight:800; font-size:13px; color:#E65100; margin-bottom:3px;">
+                        {t('sea_warning_title')}
+                    </div>
+                    <div style="font-size:12px; color:{txt_col}; line-height:1.4;">
+                        {st.session_state['geo_error']}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                col_snap, col_dismiss = st.columns([1.5, 1.0])
+                suggested = st.session_state.get("suggested_snap")
+                with col_snap:
+                    if suggested and st.button(f"{t('snap_to_land_btn')}: {suggested['name']}", key="btn_snap_land", type="primary", use_container_width=True):
+                        st.session_state.pop("geo_error", None)
+                        st.session_state.pop("rejected_coord", None)
+                        st.session_state.pop("suggested_snap", None)
+                        st.session_state["selected_lat"] = suggested["lat"]
+                        st.session_state["selected_lon"] = suggested["lon"]
+                        st.session_state["location_name"] = suggested["name"]
+                        st.rerun()
+                with col_dismiss:
+                    if st.button("✕ Cerrar aviso" if current_lang == "es" else "✕ Dismiss", key="btn_dismiss_geo", use_container_width=True):
+                        st.session_state.pop("geo_error", None)
+                        st.session_state.pop("rejected_coord", None)
+                        st.session_state.pop("suggested_snap", None)
+                        st.rerun()
+
             clicked = render_costa_rica_map(
                 selected_lat=lat,
                 selected_lon=lon,
                 location_name=loc_name,
                 elevation_m=actual_alt,
                 show_reference_zones=show_zones,
+                rejected_coord=st.session_state.get("rejected_coord"),
                 map_height=490,
             )
             if clicked:
                 c_lat, c_lon = clicked
                 if abs(c_lat - lat) > 0.005 or abs(c_lon - lon) > 0.005:
                     if CR_LAT_MIN <= c_lat <= CR_LAT_MAX and CR_LON_MIN <= c_lon <= CR_LON_MAX:
-                        nearest = find_closest_location(c_lat, c_lon)
-                        st.session_state["selected_lat"] = c_lat
-                        st.session_state["selected_lon"] = c_lon
-                        st.session_state["location_name"] = f"({c_lat:.3f}, {c_lon:.3f}) · {nearest['canton']}"
-                        st.rerun()
+                        val = validate_terrestrial_location(c_lat, c_lon)
+                        if not val["is_valid"]:
+                            err_msg = val["message_es"] if current_lang == "es" else val["message_en"]
+                            st.session_state["geo_error"] = err_msg
+                            st.session_state["rejected_coord"] = (
+                                c_lat,
+                                c_lon,
+                                val["classification_es"] if current_lang == "es" else val["classification_en"],
+                            )
+                            st.session_state["suggested_snap"] = val["closest_land_location"]
+                            st.rerun()
+                        else:
+                            st.session_state.pop("geo_error", None)
+                            st.session_state.pop("rejected_coord", None)
+                            st.session_state.pop("suggested_snap", None)
+                            st.session_state["selected_lat"] = c_lat
+                            st.session_state["selected_lon"] = c_lon
+                            nearest = val["closest_land_location"]
+                            st.session_state["location_name"] = f"({c_lat:.3f}, {c_lon:.3f}) · {nearest['canton']}"
+                            st.rerun()
 
         # ── RIGHT: Crop Viability Cards ────────────────────────────────────
         with col_cards:

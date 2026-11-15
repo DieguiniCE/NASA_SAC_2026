@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any, List
 
 from src.services.data_lake import get_unified_environmental_profile
+from src.services.land_verification import validate_terrestrial_location
 from src.models.sensitivity_viability_model import SensitivityViabilityModel
 from src.data.crops_catalog import CROPS_LIST
 from src.config import CR_LAT_MIN, CR_LAT_MAX, CR_LON_MIN, CR_LON_MAX
@@ -63,7 +64,23 @@ def calculate_viability(
     Core REST endpoint specified in GEMINI.md:
     Triggers multi-satellite data fetch (SMAP, GPM, ECOSTRESS, SRTM, IMN)
     and executes the Sensitivity Score & Success Percentage algorithm for all 5 crops.
+    Validates that coordinates correspond to terrestrial land (excludes marine / ocean zones).
     """
+    # Step 1: Terrestrial Land Verification
+    val = validate_terrestrial_location(lat, lon)
+    if not val["is_valid"]:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "NON_TERRESTRIAL_LOCATION",
+                "message": val["message_es"],
+                "message_en": val["message_en"],
+                "classification": val["classification_es"],
+                "closest_land_location": val["closest_land_location"]["name"],
+                "distance_to_land_km": val["distance_to_land_km"],
+            }
+        )
+
     try:
         # Step 2: Data Fetch
         env_profile = get_unified_environmental_profile(lat, lon)

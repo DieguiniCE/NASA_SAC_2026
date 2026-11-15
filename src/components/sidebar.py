@@ -4,6 +4,7 @@ import streamlit as st
 from typing import Tuple
 from src.config import CR_LAT_MIN, CR_LAT_MAX, CR_LON_MIN, CR_LON_MAX
 from src.data.costa_rica_locations import COSTA_RICA_LOCATIONS, get_all_locations, find_closest_location
+from src.services.land_verification import validate_terrestrial_location
 from src.i18n import t
 
 PAGE_ANALYZE  = "analyze"
@@ -133,6 +134,8 @@ def render_sidebar() -> Tuple[str, float, float, str, bool, bool, str]:
             chosen_loc = next(c for c in canton_list if c["name"] == selected_canton_name)
 
             if st.button(t("set_location_btn"), use_container_width=True, type="primary"):
+                st.session_state.pop("geo_error", None)
+                st.session_state.pop("rejected_coord", None)
                 st.session_state["selected_lat"] = chosen_loc["lat"]
                 st.session_state["selected_lon"] = chosen_loc["lon"]
                 st.session_state["location_name"] = chosen_loc["name"]
@@ -156,6 +159,8 @@ def render_sidebar() -> Tuple[str, float, float, str, bool, bool, str]:
                 if matches:
                     for m in matches[:4]:
                         if st.button(f"→ {m['name']} ({m['province']})", key=f"sb_{m['name']}"):
+                            st.session_state.pop("geo_error", None)
+                            st.session_state.pop("rejected_coord", None)
                             st.session_state["selected_lat"] = m["lat"]
                             st.session_state["selected_lon"] = m["lon"]
                             st.session_state["location_name"] = m["name"]
@@ -182,11 +187,24 @@ def render_sidebar() -> Tuple[str, float, float, str, bool, bool, str]:
                     step=0.01,
                 )
                 if st.form_submit_button(t("update_coords"), use_container_width=True):
-                    closest = find_closest_location(new_lat, new_lon)
-                    st.session_state["selected_lat"] = new_lat
-                    st.session_state["selected_lon"] = new_lon
-                    st.session_state["location_name"] = f"({new_lat:.3f}, {new_lon:.3f}) · {closest['canton']}"
-                    st.rerun()
+                    val = validate_terrestrial_location(new_lat, new_lon)
+                    if not val["is_valid"]:
+                        err_msg = val["message_es"] if current_lang == "es" else val["message_en"]
+                        st.session_state["geo_error"] = err_msg
+                        st.session_state["rejected_coord"] = (
+                            new_lat,
+                            new_lon,
+                            val["classification_es"] if current_lang == "es" else val["classification_en"],
+                        )
+                        st.error(f"⚠️ {err_msg}")
+                    else:
+                        st.session_state.pop("geo_error", None)
+                        st.session_state.pop("rejected_coord", None)
+                        st.session_state["selected_lat"] = new_lat
+                        st.session_state["selected_lon"] = new_lon
+                        closest = val["closest_land_location"]
+                        st.session_state["location_name"] = f"({new_lat:.3f}, {new_lon:.3f}) · {closest['canton']}"
+                        st.rerun()
 
         else:
             st.caption(t("click_hint"))
